@@ -30,7 +30,7 @@ Examples:
   python evaluate_llama.py --gguf-model "bartowski/Llama-3.2-1B-Instruct-GGUF:Q4_0" --hf-token YOUR_TOKEN
   
   # Server-based evaluation using GGUF model from Hyperdrive P2P
-  python evaluate_llama.py --gguf-model "hd://REMOVED-HYPERDRIVE-KEY/medgemma-4b-it-Q4_1.gguf"
+  python evaluate_llama.py --gguf-model "hd://{KEY}/medgemma-4b-it-Q4_1.gguf"
   
   # Comparative mode - test both addon (GGUF) and transformers (PyTorch)
   python evaluate_llama.py --compare-implementations --gguf-model "bartowski/Llama-3.2-1B-Instruct-GGUF:Q4_0" --transformers-model "meta-llama/Llama-3.2-1B-Instruct" --hf-token YOUR_TOKEN
