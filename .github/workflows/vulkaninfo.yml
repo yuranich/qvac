@@ -107,25 +107,15 @@ jobs:
   run-vulkaninfo:
     runs-on: ai-run-windows11-gpu
     steps:
-      # - name: Verify the newly installed choco
-      #   shell: powershell
-      #   run: choco -?
-
-      # - name: GPU detection via nvidia-smi and vulkaninfo
-      #   continue-on-error: true
-      #   shell: powershell
-      #   run: |
-      #     Write-Host "=== GPU Device List ==="
-      #     nvidia-smi -L
-      #     Write-Host ""
-      #     Write-Host "=== Running nvidia-smi ==="
-      #     nvidia-smi
-      #     Write-Host ""
-      #     Write-Host "=== Running Vulkaninfo ==="
-      #     vulkaninfo.exe --summary
-      - name: Verify vcpkg
+      - name: GPU detection via nvidia-smi and vulkaninfo
+        continue-on-error: true
         shell: powershell
         run: |
-          git clone https://github.com/microsoft/vcpkg.git
-          .\vcpkg\bootstrap-vcpkg.bat
-          echo $env:VCPKG_ROOT
+          Write-Host "=== GPU Device List ==="
+          nvidia-smi -L
+          Write-Host ""
+          Write-Host "=== Running nvidia-smi ==="
+          nvidia-smi
+          Write-Host ""
+          Write-Host "=== Running Vulkaninfo ==="
+          vulkaninfo.exe --summary
