@@ -1,5 +1,6 @@
 import { createExecutor } from "@tetherto/qvac-test-suite/mobile";
 import {
+  profiler,
   LLAMA_3_2_1B_INST_Q4_0,
   GTE_LARGE_FP16,
   GTE_LARGE_335M_FP16_SHARD,
@@ -235,4 +236,8 @@ export const executor = createExecutor({
     new MobileParakeetExecutor(resources),
     new MobileVisionExecutor(resources),
   ],
+  profiling: {
+    init: () => profiler.enable({ mode: "summary", includeServerBreakdown: true }),
+    exportData: () => profiler.exportJSON(),
+  },
 });
