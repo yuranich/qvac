@@ -407,7 +407,7 @@ For production, configure `QVAC_INDEXER_KEYS` so CI clients connect directly to 
 QVAC_INDEXER_KEYS=<indexer1-z32-public-key>,<indexer2-z32-public-key>
 ```
 
-The RPC client will round-robin across configured indexer keys and only accept connections from peers whose public key matches the list.
+The RPC client picks a random indexer from the list on each connection attempt and only accepts peers whose public key matches the configured keys.
 
 If `QVAC_INDEXER_KEYS` is not set, the client falls back to topic-based discovery (backward compatible).
 
