@@ -5449,7 +5449,7 @@
     "description": "Supertone Supertonic 2 tts.json (model layout / sample rate)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5464,7 +5464,7 @@
     "description": "Supertone Supertonic 2 duration predictor (fp32)",
     "quantization": "fp32",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5480,7 +5480,7 @@
     "description": "Supertone Supertonic 2 text encoder (fp32)",
     "quantization": "fp32",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5496,7 +5496,7 @@
     "description": "Supertone Supertonic 2 vector estimator (fp32)",
     "quantization": "fp32",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5512,7 +5512,7 @@
     "description": "Supertone Supertonic 2 vocoder (fp32)",
     "quantization": "fp32",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5528,7 +5528,7 @@
     "description": "Supertone Supertonic 2 unicode indexer (fp32)",
     "quantization": "fp32",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5544,7 +5544,7 @@
     "description": "Supertone Supertonic 2 voice style F1 (female)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5559,7 +5559,7 @@
     "description": "Supertone Supertonic 2 voice style F2 (female)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5574,7 +5574,7 @@
     "description": "Supertone Supertonic 2 voice style F3 (female)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5589,7 +5589,7 @@
     "description": "Supertone Supertonic 2 voice style F4 (female)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5604,7 +5604,7 @@
     "description": "Supertone Supertonic 2 voice style F5 (female)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5619,7 +5619,7 @@
     "description": "Supertone Supertonic 2 voice style M1 (male)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5634,7 +5634,7 @@
     "description": "Supertone Supertonic 2 voice style M2 (male)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5649,7 +5649,7 @@
     "description": "Supertone Supertonic 2 voice style M3 (male)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5664,7 +5664,7 @@
     "description": "Supertone Supertonic 2 voice style M4 (male)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
@@ -5679,7 +5679,7 @@
     "description": "Supertone Supertonic 2 voice style M5 (male)",
     "quantization": "",
     "params": "",
-    "license": "openrail",
+    "licenseId": "openrail",
     "tags": [
       "tts",
       "supertone",
