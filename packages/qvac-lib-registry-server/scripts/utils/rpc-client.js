@@ -137,9 +137,9 @@ async function connectToRegistry ({ config, logger = console, storage = './temp-
     ;(async () => {
       try {
         if (useDirectConnect) {
-          for (const key of resolvedIndexerKeys) {
-            swarm.joinPeer(IdEnc.decode(key))
-          }
+          const picked = resolvedIndexerKeys[Math.floor(Math.random() * resolvedIndexerKeys.length)]
+          logger.info('RPC Client: Connecting to indexer', { peer: picked })
+          swarm.joinPeer(IdEnc.decode(picked))
         } else {
           const rpcDiscoveryKey = deriveRpcDiscoveryKey(autobaseKey)
           swarm.join(rpcDiscoveryKey, { client: true, server: false })
