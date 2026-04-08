@@ -62,6 +62,7 @@ test('addModelRequestSchema enforces max length on description', async t => {
     description: 'x'.repeat(513)
   })
   t.absent(result.success)
+  t.ok(result.error.issues.some(i => i.path.includes('description')), 'error references description field')
 })
 
 test('addModelRequestSchema enforces max length on deprecationReason', async t => {
@@ -70,6 +71,7 @@ test('addModelRequestSchema enforces max length on deprecationReason', async t =
     deprecationReason: 'x'.repeat(513)
   })
   t.absent(result.success)
+  t.ok(result.error.issues.some(i => i.path.includes('deprecationReason')), 'error references deprecationReason field')
 })
 
 test('addModelRequestSchema enforces tag limits', async t => {
@@ -78,12 +80,14 @@ test('addModelRequestSchema enforces tag limits', async t => {
     tags: Array.from({ length: 51 }, (_, i) => `tag-${i}`)
   })
   t.absent(tooManyTags.success, 'rejects > 50 tags')
+  t.ok(tooManyTags.error.issues.some(i => i.path.includes('tags')), 'error references tags field')
 
   const tagTooLong = addModelRequestSchema.safeParse({
     ...VALID_PAYLOAD,
     tags: ['x'.repeat(129)]
   })
   t.absent(tagTooLong.success, 'rejects tag > 128 chars')
+  t.ok(tagTooLong.error.issues.length > 0, 'error has issues')
 })
 
 test('addModelRequestSchema rejects non-boolean skipExisting', async t => {
@@ -92,6 +96,7 @@ test('addModelRequestSchema rejects non-boolean skipExisting', async t => {
     skipExisting: 'yes'
   })
   t.absent(result.success)
+  t.ok(result.error.issues.some(i => i.path.includes('skipExisting')), 'error references skipExisting field')
 })
 
 test('addModelRequestSchema rejects non-object input', async t => {
