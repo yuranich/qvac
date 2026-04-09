@@ -19,6 +19,8 @@ test('peer filter accepts connection from known indexer key', async (t) => {
   const server = new Hyperswarm({ bootstrap })
   const client = new Hyperswarm({ bootstrap })
 
+  server.on('connection', (conn) => { conn.on('error', () => {}) })
+
   t.teardown(async () => {
     await client.destroy().catch(() => {})
     await server.destroy().catch(() => {})
@@ -34,10 +36,10 @@ test('peer filter accepts connection from known indexer key', async (t) => {
     const timer = setTimeout(() => reject(new Error('no connection within 15s')), 15000)
 
     client.on('connection', (conn, peerInfo) => {
+      conn.on('error', () => {})
       const peerKey = IdEnc.normalize(peerInfo.publicKey)
 
       if (!allowedKeys.has(peerKey)) {
-        conn.on('error', () => {})
         conn.destroy()
         return
       }
@@ -108,6 +110,8 @@ test('topic-based fallback connects without indexer keys', async (t) => {
   const server = new Hyperswarm({ bootstrap })
   const client = new Hyperswarm({ bootstrap })
 
+  server.on('connection', (conn) => { conn.on('error', () => {}) })
+
   t.teardown(async () => {
     await client.destroy().catch(() => {})
     await server.destroy().catch(() => {})
@@ -123,6 +127,7 @@ test('topic-based fallback connects without indexer keys', async (t) => {
     const timer = setTimeout(() => reject(new Error('no connection within 15s')), 15000)
 
     client.on('connection', (conn, peerInfo) => {
+      conn.on('error', () => {})
       clearTimeout(timer)
       resolve(IdEnc.normalize(peerInfo.publicKey))
     })
