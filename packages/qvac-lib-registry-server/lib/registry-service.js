@@ -36,6 +36,7 @@ const { getFileMetadata } = require('../utils/file-metadata')
 const { parseCanonicalSource, resolveS3Bucket } = require('./source-helpers')
 const { isGGUFSource, isFirstShard, extractGGUFMetadata } = require('./gguf-helpers')
 const { addModelRequestSchema } = require('./model-schema')
+const { ZodError } = require('zod')
 
 const DISPATCH_PUT_MODEL = `@${QVAC_MAIN_REGISTRY}/put-model`
 const DISPATCH_PUT_LICENSE = `@${QVAC_MAIN_REGISTRY}/put-license`
@@ -605,7 +606,6 @@ class RegistryService extends ReadyResource {
   }
 
   _validateAddModelRequest (entry) {
-    const { ZodError } = require('zod')
     try {
       addModelRequestSchema.parse(entry)
     } catch (err) {
