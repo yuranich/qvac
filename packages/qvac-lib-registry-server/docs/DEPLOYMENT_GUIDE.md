@@ -531,6 +531,116 @@ node scripts/bin.js run --storage ./new-writer --bootstrap <key> --skip-storage-
 | Admin command retries | May need 1-2 retries | Usually works first try |
 | Writer coordination | Manual timing recommended | Automated/scripted works |
 
+## Monitoring
+
+Four layers of operational visibility, each independently deployable.
+
+### Layer 1: In-Process Prometheus /metrics Endpoint
+
+The registry server exposes Prometheus metrics via an HTTP endpoint bound to `127.0.0.1`.
+
+**Start with metrics enabled (default port 9090):**
+
+```bash
+node scripts/bin.js run --storage ./corestore --metrics-port 9090
+```
+
+**Or disable metrics:**
+
+```bash
+node scripts/bin.js run --storage ./corestore --metrics-port 0
+```
+
+**What is exposed:**
+
+- **Holepunch P2P metrics** (via `hypercore-stats`, `hyperswarm-stats`, `hypermetrics`): core stats, swarm connections, DHT, UDX bytes/packets, per-core upload/download counters.
+- **QVAC-specific metrics:**
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `qvac_registry_models_total` | Gauge | Total models in the registry |
+| `qvac_registry_blob_cores_total` | Gauge | Number of blob cores |
+| `qvac_registry_blob_core_peers` | Gauge | Connected peers per blob core |
+| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether each blob core is fully replicated |
+| `qvac_registry_view_core_length` | Gauge | View core length (total blocks) |
+| `qvac_registry_view_core_contiguous_length` | Gauge | View core contiguous length (gap indicates replication lag) |
+| `qvac_registry_rpc_requests_total` | Counter | RPC requests by method |
+| `qvac_registry_rpc_errors_total` | Counter | RPC errors by method |
+| `qvac_registry_is_indexer` | Gauge | Whether this node is an indexer |
+| `qvac_registry_blind_peers_connected` | Gauge | Number of configured blind peers with an active connection |
+| `qvac_registry_blind_peer_connected` | Gauge | Per-blind-peer connection status (labeled by `peer_key`) |
+| `qvac_registry_blob_core_byte_length` | Gauge | Byte length per blob core |
+| `qvac_registry_model_size_bytes` | Gauge | Size of each model blob (labeled by path, engine, quantization) |
+
+**Prometheus scrape config:**
+
+```yaml
+scrape_configs:
+  - job_name: 'qvac-registry'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['127.0.0.1:9090']
+```
+
+**Security:** The metrics endpoint binds to `127.0.0.1` by default. Only Prometheus scrapers on the same host or private network should reach the port. Do not expose to the public internet.
+
+### Layer 2: hyper-health-check Sidecar
+
+Run [hyper-health-check](https://github.com/holepunchto/hyper-health-check) as a separate PM2 process to independently verify that cores are discoverable and downloadable from the swarm. The server might report healthy internals while peers cannot actually reach it.
+
+```bash
+pm2 start node_modules/.bin/hyper-health-check -- run \
+  --core <VIEW_CORE_KEY>:registry-view \
+  --core <BLOB_CORE_KEY>:blob-models \
+  --port 9091 \
+  --grace-period 600000
+```
+
+The 10-minute grace period accommodates replication lag after model additions — blind peers need time to download multi-GB blobs before being flagged as unhealthy.
+
+**Exposed metrics (on port 9091):**
+
+- `hyper_health_peers_total` — peers swarming each core
+- `hyper_health_peers_with_all_data_total` — peers with full replication
+- `hyper_health_ips_with_all_data_total` — unique IPs with full data (geographic diversity)
+
+### Layer 3: PM2 Ecosystem Config
+
+The repository includes `ecosystem.config.js` for standardized PM2 process management:
+
+```bash
+pm2 start ecosystem.config.js
+```
+
+This starts both the registry server (with metrics on port 9090) and the health-check sidecar (on port 9091).
+
+**Per-deployment customization:** Override `--core` flags for the health-check app via PM2 environment variables or by editing the `args` field.
+
+**Process-level metrics:** Install `pm2-prometheus-exporter` for CPU, memory, heap, event loop latency, restarts, and uptime metrics:
+
+```bash
+pm2 install pm2-prometheus-exporter
+```
+
+This exposes process metrics on `localhost:9209` alongside the application-level metrics from Layers 1 and 2.
+
+### Layer 4: Grafana Dashboard
+
+Use Holepunch's pre-built [Grafana dashboard](https://grafana.com/grafana/dashboards/22313-hypercore-hyperswarm/) (ID: 22313) as a baseline. It includes panels for Hypercore, Hyperswarm, HyperDHT, UDX, and Node.js process stats.
+
+**Add QVAC-specific panels for:**
+
+- **Model availability:** `qvac_registry_models_total`, `hyper_health_peers_with_all_data_total`
+- **Storage breakdown:** `qvac_registry_model_size_bytes` by engine/quantization, `sum(qvac_registry_blob_core_byte_length)`
+- **RPC activity:** `rate(qvac_registry_rpc_requests_total[5m])`, error ratio
+- **Cluster health:** `qvac_registry_is_indexer` across nodes, `qvac_registry_view_core_length` vs `qvac_registry_view_core_contiguous_length`
+
+**Import the baseline dashboard:**
+
+1. Add Prometheus as a data source in Grafana (URL: `http://127.0.0.1:9090`)
+2. Import dashboard ID `22313`
+3. Add custom panels for QVAC metrics
+
 ## Reference
 
 ### Environment Variables
@@ -554,6 +664,7 @@ node scripts/bin.js run --storage ./new-writer --bootstrap <key> --skip-storage-
 | `node scripts/bin.js run --storage <path>` | Start a writer |
 | `node scripts/bin.js run --bootstrap <key>` | Join existing cluster |
 | `node scripts/bin.js run --blind-peers <keys>` | Enable blind peer replication |
+| `node scripts/bin.js run --metrics-port <port>` | Prometheus metrics port (default: 9090, 0 to disable) |
 | `node scripts/bin.js run --skip-storage-check` | Bypass storage/bootstrap key mismatch check |
 | `node scripts/bin.js init-writer --storage <path>` | Initialize/authorize a writer client |
 | `node scripts/bin.js sync-models --file <path>` | Sync models from JSON config |

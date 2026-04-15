@@ -53,6 +53,7 @@ class QVACRegistryClient extends ReadyResource {
     this.hyperswarm.on('connection', this._connectionHandler)
 
     this._metadataReady = this._connectMetadataCore()
+    await this._metadataReady
   }
 
   async _connectMetadataCore () {

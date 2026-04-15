@@ -70,10 +70,12 @@ class RegistryService extends ReadyResource {
 
     this.blobsStore = this.store.namespace('blobs')
     this.blobsCores = new Map()
+    this._peerConnectionCounts = new Map()
     this._indexerMonitor = null
     this._mirroredCoreIds = new Set()
     this.blindPeering = null
     this.reseedTracker = null
+    this.metrics = null
 
     this._registerApplyHandlers()
 
@@ -148,10 +150,15 @@ class RegistryService extends ReadyResource {
     })
 
     this.swarm.on('connection', (conn, peerInfo) => {
-      const peerKey = peerInfo?.publicKey ? IdEnc.normalize(peerInfo.publicKey) : 'unknown'
+      const peerKey = peerInfo?.publicKey ? IdEnc.normalize(peerInfo.publicKey) : null
 
-      this.logger.info({ peer: peerKey }, 'Swarm connection opened')
-      conn.on('close', () => this.logger.info({ peer: peerKey }, 'Swarm connection closed'))
+      if (peerKey) this._trackPeerConnection(peerKey)
+
+      this.logger.info({ peer: peerKey || 'unknown' }, 'Swarm connection opened')
+      conn.on('close', () => {
+        if (peerKey) this._untrackPeerConnection(peerKey)
+        this.logger.info({ peer: peerKey || 'unknown' }, 'Swarm connection closed')
+      })
 
       this._setupRpc(conn)
 
@@ -307,6 +314,7 @@ class RegistryService extends ReadyResource {
       })
     }
     this.blobsCores.clear()
+    this._peerConnectionCounts.clear()
     this._mirroredCoreIds.clear()
 
     this.logger.info('RegistryService: closed')
@@ -468,28 +476,34 @@ class RegistryService extends ReadyResource {
     rpc.respond(
       'add-model',
       async (entry) => {
-        ensureWriterAccess()
+        if (this.metrics) this.metrics.recordRpcRequest('add-model')
+        try {
+          ensureWriterAccess()
 
-        if (!this.opened) await this.ready()
-        await this._ensureIndexer()
+          if (!this.opened) await this.ready()
+          await this._ensureIndexer()
 
-        const skipExisting = entry.skipExisting || false
-        const modelEntry = { ...entry }
-        delete modelEntry.skipExisting
+          const skipExisting = entry.skipExisting || false
+          const modelEntry = { ...entry }
+          delete modelEntry.skipExisting
 
-        const result = await this.addModel(modelEntry, { skipExisting })
+          const result = await this.addModel(modelEntry, { skipExisting })
 
-        this.logger.info({
-          path: result.path,
-          source: result.source
-        }, 'RPC: add-model completed')
-
-        return {
-          success: true,
-          model: {
+          this.logger.info({
             path: result.path,
             source: result.source
+          }, 'RPC: add-model completed')
+
+          return {
+            success: true,
+            model: {
+              path: result.path,
+              source: result.source
+            }
           }
+        } catch (err) {
+          if (this.metrics) this.metrics.recordRpcError('add-model')
+          throw err
         }
       }
     )
@@ -497,19 +511,25 @@ class RegistryService extends ReadyResource {
     rpc.respond(
       'put-license',
       async (licenseRecord) => {
-        ensureWriterAccess()
+        if (this.metrics) this.metrics.recordRpcRequest('put-license')
+        try {
+          ensureWriterAccess()
 
-        if (!this.opened) await this.ready()
-        await this._ensureIndexer()
-        await this.putLicense(licenseRecord)
+          if (!this.opened) await this.ready()
+          await this._ensureIndexer()
+          await this.putLicense(licenseRecord)
 
-        this.logger.info({
-          spdxId: licenseRecord.spdxId
-        }, 'RPC: put-license completed')
+          this.logger.info({
+            spdxId: licenseRecord.spdxId
+          }, 'RPC: put-license completed')
 
-        return {
-          success: true,
-          message: 'License operation appended'
+          return {
+            success: true,
+            message: 'License operation appended'
+          }
+        } catch (err) {
+          if (this.metrics) this.metrics.recordRpcError('put-license')
+          throw err
         }
       }
     )
@@ -517,45 +537,51 @@ class RegistryService extends ReadyResource {
     rpc.respond(
       'update-model-metadata',
       async (data) => {
-        ensureWriterAccess()
+        if (this.metrics) this.metrics.recordRpcRequest('update-model-metadata')
+        try {
+          ensureWriterAccess()
 
-        if (!data.path) throw new TypeError('path is required')
-        if (!data.source) throw new TypeError('source is required')
+          if (!data.path) throw new TypeError('path is required')
+          if (!data.source) throw new TypeError('source is required')
 
-        if (!this.opened) await this.ready()
-        await this._ensureIndexer()
+          if (!this.opened) await this.ready()
+          await this._ensureIndexer()
 
-        const existing = await this.getModelByKey({ path: data.path, source: data.source })
-        if (!existing) throw new Error(`Model not found: ${data.path}`)
+          const existing = await this.getModelByKey({ path: data.path, source: data.source })
+          if (!existing) throw new Error(`Model not found: ${data.path}`)
 
-        // If explicitly undeprecating, clear deprecation fields
-        const isUndeprecating = data.deprecated === false
+          // If explicitly undeprecating, clear deprecation fields
+          const isUndeprecating = data.deprecated === false
 
-        const updated = {
-          ...existing,
-          engine: data.engine ?? existing.engine,
-          licenseId: data.licenseId ?? existing.licenseId,
-          description: data.description ?? existing.description,
-          quantization: data.quantization ?? existing.quantization,
-          params: data.params ?? existing.params,
-          notes: data.notes ?? existing.notes,
-          tags: data.tags ?? existing.tags,
-          deprecated: data.deprecated !== undefined ? data.deprecated : existing.deprecated,
-          deprecatedAt: isUndeprecating ? '' : (data.deprecatedAt ?? existing.deprecatedAt),
-          replacedBy: isUndeprecating ? '' : (data.replacedBy ?? existing.replacedBy),
-          deprecationReason: isUndeprecating ? '' : (data.deprecationReason ?? existing.deprecationReason)
-        }
+          const updated = {
+            ...existing,
+            engine: data.engine ?? existing.engine,
+            licenseId: data.licenseId ?? existing.licenseId,
+            description: data.description ?? existing.description,
+            quantization: data.quantization ?? existing.quantization,
+            params: data.params ?? existing.params,
+            notes: data.notes ?? existing.notes,
+            tags: data.tags ?? existing.tags,
+            deprecated: data.deprecated !== undefined ? data.deprecated : existing.deprecated,
+            deprecatedAt: isUndeprecating ? '' : (data.deprecatedAt ?? existing.deprecatedAt),
+            replacedBy: isUndeprecating ? '' : (data.replacedBy ?? existing.replacedBy),
+            deprecationReason: isUndeprecating ? '' : (data.deprecationReason ?? existing.deprecationReason)
+          }
 
-        await this._appendOperation(DISPATCH_PUT_MODEL, updated)
+          await this._appendOperation(DISPATCH_PUT_MODEL, updated)
 
-        const viewLength = this.view?.core?.length ?? 0
-        const viewContiguous = this.view?.core?.contiguousLength ?? 0
-        const viewSigned = this.view?.core?.signedLength ?? 0
-        this.logger.info({ path: data.path, viewLength, viewContiguous, viewSigned }, 'RPC: update-model-metadata completed')
+          const viewLength = this.view?.core?.length ?? 0
+          const viewContiguous = this.view?.core?.contiguousLength ?? 0
+          const viewSigned = this.view?.core?.signedLength ?? 0
+          this.logger.info({ path: data.path, viewLength, viewContiguous, viewSigned }, 'RPC: update-model-metadata completed')
 
-        return {
-          success: true,
-          model: updated
+          return {
+            success: true,
+            model: updated
+          }
+        } catch (err) {
+          if (this.metrics) this.metrics.recordRpcError('update-model-metadata')
+          throw err
         }
       }
     )
@@ -563,31 +589,42 @@ class RegistryService extends ReadyResource {
     rpc.respond(
       'delete-model',
       async (data) => {
-        ensureWriterAccess()
+        if (this.metrics) this.metrics.recordRpcRequest('delete-model')
+        try {
+          ensureWriterAccess()
 
-        if (!data.path) throw new TypeError('path is required')
-        if (!data.source) throw new TypeError('source is required')
+          if (!data.path) throw new TypeError('path is required')
+          if (!data.source) throw new TypeError('source is required')
 
-        if (!this.opened) await this.ready()
-        await this._ensureIndexer()
+          if (!this.opened) await this.ready()
+          await this._ensureIndexer()
 
-        const result = await this.deleteModel({ path: data.path, source: data.source })
+          const result = await this.deleteModel({ path: data.path, source: data.source })
 
-        this.logger.info({
-          path: data.path,
-          source: data.source
-        }, 'RPC: delete-model completed')
+          this.logger.info({
+            path: data.path,
+            source: data.source
+          }, 'RPC: delete-model completed')
 
-        return result
+          return result
+        } catch (err) {
+          if (this.metrics) this.metrics.recordRpcError('delete-model')
+          throw err
+        }
       }
     )
 
-    // Server identification endpoint - allows RPC clients to verify they connected
-    // to the actual server and not a blind peer (which won't have RPC responders)
     rpc.respond('ping', async () => {
+      if (this.metrics) this.metrics.recordRpcRequest('ping')
       return {
         role: 'registry-server',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        isIndexer: this.base?.isIndexer ?? false,
+        modelCount: this.view?.core?.length ?? 0,
+        peerCount: this.swarm?.connections?.size ?? 0,
+        blobCoresCount: this.blobsCores.size,
+        viewCoreLength: this.view?.core?.length ?? 0,
+        viewCoreContiguousLength: this.view?.core?.contiguousLength ?? 0
       }
     })
 
@@ -826,6 +863,34 @@ class RegistryService extends ReadyResource {
     this.logger.info('Indexer status confirmed')
   }
 
+  _trackPeerConnection (peerKey) {
+    const current = this._peerConnectionCounts.get(peerKey) || 0
+    this._peerConnectionCounts.set(peerKey, current + 1)
+  }
+
+  _untrackPeerConnection (peerKey) {
+    const current = this._peerConnectionCounts.get(peerKey) || 0
+    if (current <= 1) {
+      this._peerConnectionCounts.delete(peerKey)
+      return
+    }
+
+    this._peerConnectionCounts.set(peerKey, current - 1)
+  }
+
+  getConfiguredBlindPeerKeys () {
+    return [...new Set(this.blindPeerKeys)]
+  }
+
+  isBlindPeerConnected (peerKey) {
+    return (this._peerConnectionCounts.get(peerKey) || 0) > 0
+  }
+
+  getConnectedBlindPeerKeys () {
+    return this.getConfiguredBlindPeerKeys()
+      .filter(peerKey => this.isBlindPeerConnected(peerKey))
+  }
+
   async _downloadArtifact (sourceInfo, localPath) {
     switch (sourceInfo.protocol) {
       case 'hf':
@@ -969,7 +1034,6 @@ class RegistryService extends ReadyResource {
       discoveryKey: core.discoveryKey.toString('hex')
     }, 'Hyperblobs core ready')
 
-    // Caller is responsible for mirroring after data is added
     return entry
   }
 
