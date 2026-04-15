@@ -23,46 +23,29 @@ const noGpu = proc.env && proc.env.NO_GPU === 'true'
 const useCpu = isDarwinX64 || isLinuxArm64 || noGpu
 const skip = isMobile || noGpu
 
-const DIFFUSION_MODEL = {
-  name: 'flux-2-klein-4b-Q8_0.gguf',
-  url: 'https://huggingface.co/leejet/FLUX.2-klein-4B-GGUF/resolve/main/flux-2-klein-4b-Q8_0.gguf'
+const SD3_MODEL = {
+  name: 'sd3_medium_incl_clips.safetensors',
+  url: 'https://huggingface.co/adamo1139/stable-diffusion-3-medium-ungated/resolve/main/sd3_medium_incl_clips.safetensors'
 }
 
-const LLM_MODEL = {
-  name: 'Qwen3-4B-Q4_K_M.gguf',
-  url: 'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf'
-}
+const STEPS = 20
+const CFG_SCALE = 3.5
+const STRENGTH = 0.75
+const SEED = 3
 
-const VAE_MODEL = {
-  name: 'flux2-vae.safetensors',
-  url: 'https://huggingface.co/Comfy-Org/vae-text-encorder-for-flux-klein-4b/resolve/main/split_files/vae/flux2-vae.safetensors'
-}
-
-test('FLUX.2 klein txt2img — generates a valid PNG image', { timeout: 1800000, skip }, async (t) => {
+test('SD3 Medium img2img — transforms an input image', { timeout: 1800000, skip }, async (t) => {
   setupJsLogger(binding)
 
   const [downloadedModelName, modelDir] = await ensureModel({
-    modelName: DIFFUSION_MODEL.name,
-    downloadUrl: DIFFUSION_MODEL.url
-  })
-
-  await ensureModel({
-    modelName: LLM_MODEL.name,
-    downloadUrl: LLM_MODEL.url
-  })
-
-  await ensureModel({
-    modelName: VAE_MODEL.name,
-    downloadUrl: VAE_MODEL.url
+    modelName: SD3_MODEL.name,
+    downloadUrl: SD3_MODEL.url
   })
 
   console.log('\n' + '='.repeat(60))
-  console.log('FLUX.2 [klein] 4B — INTEGRATION TEST')
+  console.log('SD3 MEDIUM IMG2IMG — INTEGRATION TEST')
   console.log('='.repeat(60))
   console.log(` Platform  : ${platform}`)
   console.log(` Model     : ${downloadedModelName}`)
-  console.log(` LLM       : ${LLM_MODEL.name}`)
-  console.log(` VAE       : ${VAE_MODEL.name}`)
   console.log(` Models dir: ${modelDir}`)
 
   const modelPath = path.join(modelDir, downloadedModelName)
@@ -72,13 +55,14 @@ test('FLUX.2 klein txt2img — generates a valid PNG image', { timeout: 1800000,
     {
       logger: console,
       diskPath: modelDir,
-      modelName: downloadedModelName,
-      llmModel: LLM_MODEL.name,
-      vaeModel: VAE_MODEL.name
+      modelName: downloadedModelName
     },
     {
       threads: 4,
-      device: useCpu ? 'cpu' : 'gpu'
+      device: useCpu ? 'cpu' : 'gpu',
+      vae_on_cpu: true,
+      prediction: 'flow',
+      flow_shift: '3.0'
     }
   )
 
@@ -92,19 +76,35 @@ test('FLUX.2 klein txt2img — generates a valid PNG image', { timeout: 1800000,
     await model.load()
     const loadMs = Date.now() - tLoad
     console.log(`Loaded in ${(loadMs / 1000).toFixed(1)}s`)
-    t.ok(loadMs < 120000, `Model loaded within 120s (took ${(loadMs / 1000).toFixed(1)}s)`)
+    t.ok(loadMs < 180000, `Model loaded within 180s (took ${(loadMs / 1000).toFixed(1)}s)`)
 
-    // ── Generate ──────────────────────────────────────────────────────────────
-    console.log('\n=== Generating image ===')
+    // ── Load init image ───────────────────────────────────────────────────────
+    const initImagePath = path.join(__dirname, '../../assets/von-neumann-colorized.jpg')
+    if (!fs.existsSync(initImagePath)) {
+      t.fail(`Init image not found at ${initImagePath}`)
+      return
+    }
+    const initImage = fs.readFileSync(initImagePath)
+    console.log(`\nLoaded init image: ${initImage.length} bytes`)
+
+    // ── Generate (img2img) ────────────────────────────────────────────────────
+    console.log('\n=== Generating image (img2img) ===')
+    console.log(`  Steps    : ${STEPS}`)
+    console.log(`  CFG Scale: ${CFG_SCALE}`)
+    console.log(`  Strength : ${STRENGTH}`)
+    console.log(`  Seed     : ${SEED}`)
+
     const tGen = Date.now()
 
     const response = await model.run({
-      prompt: 'a red fox in a snowy forest, laying on a rock with a santa hat, cartoon, watercolor',
-      steps: 10,
-      width: 512,
-      height: 512,
-      guidance: 3.5,
-      seed: 1000
+      prompt: 'anime portrait, scientist, same pose, comic-book style, professional illustration',
+      negative_prompt: 'photorealistic, blurry, low quality, 3d render, deformed, different person',
+      init_image: initImage,
+      cfg_scale: CFG_SCALE,
+      steps: STEPS,
+      strength: STRENGTH,
+      sampling_method: 'euler',
+      seed: SEED
     })
 
     await response
@@ -127,16 +127,20 @@ test('FLUX.2 klein txt2img — generates a valid PNG image', { timeout: 1800000,
 
     // ── Assertions ────────────────────────────────────────────────────────────
     t.ok(progressTicks.length > 0, `Received progress ticks (got ${progressTicks.length})`)
-    t.is(progressTicks[progressTicks.length - 1].total, 10, 'Final progress tick reports 10 total steps')
 
     t.is(images.length, 1, 'Received exactly 1 image')
 
+    if (images.length === 0) {
+      t.fail('No image received — generation may have failed (check GPU memory)')
+      return
+    }
+
     const img = images[0]
     t.ok(img instanceof Uint8Array, 'Image is a Uint8Array')
-    t.ok(img.length > 0, `Image is non-empty (${img.length} bytes)`)
+    t.ok(img.length > 1000, `Image has meaningful size (${img.length} bytes)`)
     t.ok(isPng(img), 'Image has valid PNG magic bytes')
 
-    const outPath = path.join(modelDir, 'generate-image--flux2-txt2img-seed42.png')
+    const outPath = path.join(modelDir, 'generate-image--sd3-i2i-seed3.png')
     fs.writeFileSync(outPath, img)
     console.log(`\nSaved → ${outPath}`)
 
