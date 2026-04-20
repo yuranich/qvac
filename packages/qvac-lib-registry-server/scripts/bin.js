@@ -21,7 +21,8 @@ const HyperswarmStats = require('hyperswarm-stats')
 const promClient = require('prom-client')
 const { AUTOBASE_NAMESPACE } = require('@qvac/registry-schema')
 
-const DEFAULT_METRICS_PORT = 9090
+const DEFAULT_METRICS_PORT = 9210
+const DEFAULT_METRICS_HOST = '127.0.0.1'
 
 const DEFAULT_STORAGE = './corestore'
 const DEFAULT_WRITER_STORAGE = './writer-storage'
@@ -44,6 +45,7 @@ const runCmd = command('run',
   flag('--compaction-interval [ms]', `Periodic RocksDB compaction interval in ms (default: ${DEFAULT_COMPACTION_INTERVAL_MS}, 0 to disable)`),
   flag('--skip-storage-check', 'Skip storage/bootstrap key mismatch check (use when joining existing cluster with fresh storage)'),
   flag('--metrics-port [port]', `Prometheus metrics HTTP port (default: ${DEFAULT_METRICS_PORT}, 0 to disable)`),
+  flag('--metrics-host [host]', `Prometheus metrics HTTP bind address (default: ${DEFAULT_METRICS_HOST}; use 0.0.0.0 to expose on all interfaces)`),
   async function ({ flags }) {
     const logger = createLogger()
 
@@ -98,6 +100,12 @@ const runCmd = command('run',
       ? parseInt(flags.metricsPort, 10)
       : DEFAULT_METRICS_PORT
 
+    if (Number.isNaN(metricsPort) || metricsPort < 0) {
+      throw new Error('--metrics-port must be a non-negative integer (0 to disable)')
+    }
+
+    const metricsHost = flags.metricsHost || DEFAULT_METRICS_HOST
+
     let metricsServer = null
     if (metricsPort > 0) {
       const qvacMetrics = new QvacMetrics(service, { logger })
@@ -106,7 +114,7 @@ const runCmd = command('run',
       HypercoreStats.fromCorestore(store).registerPrometheusMetrics(promClient)
       new HyperswarmStats(swarm).registerPrometheusMetrics(promClient) // eslint-disable-line no-new
 
-      metricsServer = new MetricsServer(promClient.register, { port: metricsPort, logger })
+      metricsServer = new MetricsServer(promClient.register, { port: metricsPort, host: metricsHost, logger })
       await metricsServer.ready()
     }
 

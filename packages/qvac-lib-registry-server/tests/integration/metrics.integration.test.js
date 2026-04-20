@@ -208,3 +208,42 @@ test('MetricsServer closes cleanly', async (t) => {
     await cleanup(ctx)
   }
 })
+
+test('MetricsServer binds to custom host', async (t) => {
+  const basePath = await createTempStorage(t)
+  const store = new Corestore(basePath)
+  await store.ready()
+
+  const swarm = new Hyperswarm({ bootstrap: [] })
+  const config = new RegistryConfig({ logger: noopLogger })
+
+  const service = new RegistryService(
+    store.namespace(AUTOBASE_NAMESPACE),
+    swarm,
+    config,
+    { logger: noopLogger, ackInterval: 5, skipStorageCheck: true }
+  )
+  await service.ready()
+
+  promClient.register.clear()
+
+  const metricsServer = new MetricsServer(promClient.register, {
+    port: 0,
+    host: '127.0.0.1',
+    logger: noopLogger
+  })
+
+  const ctx = { service, store, swarm, metricsServer }
+
+  try {
+    await metricsServer.ready()
+
+    const address = metricsServer._server.address()
+    t.is(address.address, '127.0.0.1', 'bound to requested host')
+
+    const res = await httpGet(address.port, '/metrics')
+    t.is(res.status, 200, 'reachable on requested host')
+  } finally {
+    await cleanup(ctx)
+  }
+})

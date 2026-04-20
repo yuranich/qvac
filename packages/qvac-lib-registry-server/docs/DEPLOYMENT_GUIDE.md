@@ -572,17 +572,38 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_blob_core_byte_length` | Gauge | Byte length per blob core |
 | `qvac_registry_model_size_bytes` | Gauge | Size of each model blob (labeled by path, engine, quantization) |
 
-**Prometheus scrape config:**
+**Prometheus scrape config (local Prometheus, loopback bind):**
 
 ```yaml
 scrape_configs:
   - job_name: 'qvac-registry'
     scrape_interval: 30s
     static_configs:
-      - targets: ['127.0.0.1:9090']
+      - targets: ['127.0.0.1:9210']
 ```
 
-**Security:** The metrics endpoint binds to `127.0.0.1` by default. Only Prometheus scrapers on the same host or private network should reach the port. Do not expose to the public internet.
+**Prometheus scrape config (central Prometheus scraping multiple registry VMs):**
+
+Run the registry with `--metrics-host 0.0.0.0` (or the private-network NIC address) so a remote Prometheus can reach the endpoint. Attach matching labels across jobs (`node-exporter`, `pm2-prometheus-exporter`, `qvac-registry`) so Grafana template variables work uniformly.
+
+```yaml
+scrape_configs:
+  - job_name: 'qvac-registry'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['<REGISTRY_VM_1_PRIVATE_IP>:9210']
+        labels:
+          vm_name: '<registry-node-1>'
+          network: '<private-network>'
+          zone: '<region-zone>'
+      - targets: ['<REGISTRY_VM_2_PRIVATE_IP>:9210']
+        labels:
+          vm_name: '<registry-node-2>'
+          network: '<private-network>'
+          zone: '<region-zone>'
+```
+
+**Security:** Port 9210 is chosen to avoid confusion with Prometheus's own port 9090 and to sit next to pm2-prometheus-exporter on 9209. The endpoint binds to `127.0.0.1` by default. When exposing on a private network via `--metrics-host`, restrict access with firewall rules, VPN/overlay network ACLs (WireGuard, Tailscale, Nebula), or a VPC security group. Do not expose to the public internet.
 
 ### Layer 2: hyper-health-check Sidecar
 
@@ -612,7 +633,7 @@ The repository includes `ecosystem.config.js` for standardized PM2 process manag
 pm2 start ecosystem.config.js
 ```
 
-This starts both the registry server (with metrics on port 9090) and the health-check sidecar (on port 9091).
+This starts both the registry server (with metrics on port 9210, loopback by default) and the health-check sidecar (on port 9091). For remote Prometheus scraping, edit the `args` field to add `--metrics-host <private-ip|0.0.0.0>` and ensure the port is firewalled to trusted scrapers only.
 
 **Per-deployment customization:** Override `--core` flags for the health-check app via PM2 environment variables or by editing the `args` field.
 
@@ -637,7 +658,7 @@ Use Holepunch's pre-built [Grafana dashboard](https://grafana.com/grafana/dashbo
 
 **Import the baseline dashboard:**
 
-1. Add Prometheus as a data source in Grafana (URL: `http://127.0.0.1:9090`)
+1. Add Prometheus as a data source in Grafana (URL of the Prometheus server itself, e.g. `http://prometheus-vm:9090`)
 2. Import dashboard ID `22313`
 3. Add custom panels for QVAC metrics
 
@@ -664,7 +685,8 @@ Use Holepunch's pre-built [Grafana dashboard](https://grafana.com/grafana/dashbo
 | `node scripts/bin.js run --storage <path>` | Start a writer |
 | `node scripts/bin.js run --bootstrap <key>` | Join existing cluster |
 | `node scripts/bin.js run --blind-peers <keys>` | Enable blind peer replication |
-| `node scripts/bin.js run --metrics-port <port>` | Prometheus metrics port (default: 9090, 0 to disable) |
+| `node scripts/bin.js run --metrics-port <port>` | Prometheus metrics port (default: 9210, 0 to disable) |
+| `node scripts/bin.js run --metrics-host <host>` | Prometheus metrics bind address (default: 127.0.0.1; use 0.0.0.0 or a private NIC IP to expose) |
 | `node scripts/bin.js run --skip-storage-check` | Bypass storage/bootstrap key mismatch check |
 | `node scripts/bin.js init-writer --storage <path>` | Initialize/authorize a writer client |
 | `node scripts/bin.js sync-models --file <path>` | Sync models from JSON config |

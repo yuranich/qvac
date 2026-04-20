@@ -5,7 +5,7 @@ module.exports = {
     {
       name: 'registry',
       script: 'scripts/bin.js',
-      args: 'run --storage ./corestore --metrics-port 9090',
+      args: 'run --storage ./corestore --metrics-port 9210',
       env: {
         NODE_ENV: 'production'
       }

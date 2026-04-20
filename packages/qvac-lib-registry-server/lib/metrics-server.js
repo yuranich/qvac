@@ -3,7 +3,7 @@
 const http = require('http')
 const ReadyResource = require('ready-resource')
 
-const DEFAULT_PORT = 9090
+const DEFAULT_PORT = 9210
 const DEFAULT_HOST = '127.0.0.1'
 
 class MetricsServer extends ReadyResource {
