@@ -618,13 +618,7 @@ class RegistryService extends ReadyResource {
       if (this.metrics) this.metrics.recordRpcRequest('ping')
       return {
         role: 'registry-server',
-        timestamp: Date.now(),
-        isIndexer: this.base?.isIndexer ?? false,
-        modelCount: this.view?.core?.length ?? 0,
-        peerCount: this.swarm?.connections?.size ?? 0,
-        blobCoresCount: this.blobsCores.size,
-        viewCoreLength: this.view?.core?.length ?? 0,
-        viewCoreContiguousLength: this.view?.core?.contiguousLength ?? 0
+        timestamp: Date.now()
       }
     })
 
