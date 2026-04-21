@@ -2,6 +2,17 @@
 
 const promClient = require('prom-client')
 
+// RPC methods that the registry service exposes. Pre-initialising counter
+// series at zero for each method means `rate()` returns 0 (instead of NaN)
+// from the first scrape, so dashboards do not appear empty on a fresh start.
+const RPC_METHODS = Object.freeze([
+  'add-model',
+  'put-license',
+  'update-model-metadata',
+  'delete-model',
+  'ping'
+])
+
 class QvacMetrics {
   constructor (service, opts = {}) {
     this._service = service
@@ -19,6 +30,11 @@ class QvacMetrics {
       labelNames: ['method']
     })
 
+    for (const method of RPC_METHODS) {
+      this._rpcRequests.inc({ method }, 0)
+      this._rpcErrors.inc({ method }, 0)
+    }
+
     this._registerGauges()
   }
 
@@ -35,8 +51,8 @@ class QvacMetrics {
 
     // eslint-disable-next-line no-new
     new promClient.Gauge({
-      name: 'qvac_registry_models_total',
-      help: 'Total number of models in the registry',
+      name: 'qvac_registry_model_count',
+      help: 'Number of models in the registry',
       collect () {
         this.set(self._service.modelCount)
       }
@@ -56,7 +72,7 @@ class QvacMetrics {
     // eslint-disable-next-line no-new
     new promClient.Gauge({
       name: 'qvac_registry_totals_refreshed_age_seconds',
-      help: 'Seconds since qvac_registry_total_blob_bytes and qvac_registry_models_total were last recomputed (-1 if never)',
+      help: 'Seconds since qvac_registry_total_blob_bytes and qvac_registry_model_count were last recomputed (-1 if never)',
       collect () {
         const ts = self._service.totalsRefreshedAt
         this.set(ts ? (Date.now() - ts) / 1000 : -1)
@@ -65,8 +81,8 @@ class QvacMetrics {
 
     // eslint-disable-next-line no-new
     new promClient.Gauge({
-      name: 'qvac_registry_blob_cores_total',
-      help: 'Number of blob cores',
+      name: 'qvac_registry_blob_core_count',
+      help: 'Number of blob cores opened locally on this node',
       collect () {
         this.set(self._service.blobsCores.size)
       }

@@ -1062,7 +1062,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_models_total",
+          "expr": "qvac_registry_model_count",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1246,7 +1246,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_blob_cores_total",
+          "expr": "qvac_registry_blob_core_count",
           "legendFormat": "",
           "refId": "A"
         }

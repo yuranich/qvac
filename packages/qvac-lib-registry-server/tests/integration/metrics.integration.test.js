@@ -111,10 +111,10 @@ test('/metrics includes QVAC custom gauges', async (t) => {
     const res = await httpGet(ctx.port, '/metrics')
     const body = res.body
 
-    t.ok(body.includes('qvac_registry_models_total'), 'has models_total')
+    t.ok(body.includes('qvac_registry_model_count'), 'has model_count')
     t.ok(body.includes('qvac_registry_total_blob_bytes'), 'has total_blob_bytes')
     t.ok(body.includes('qvac_registry_totals_refreshed_age_seconds'), 'has totals_refreshed_age_seconds')
-    t.ok(body.includes('qvac_registry_blob_cores_total'), 'has blob_cores_total')
+    t.ok(body.includes('qvac_registry_blob_core_count'), 'has blob_core_count')
     t.ok(body.includes('qvac_registry_view_core_length'), 'has view_core_length')
     t.ok(body.includes('qvac_registry_view_core_contiguous_length'), 'has view_core_contiguous_length')
     t.ok(body.includes('qvac_registry_is_indexer'), 'has is_indexer')
@@ -128,12 +128,24 @@ test('/metrics includes QVAC custom gauges', async (t) => {
     t.ok(totalBytesLine, 'exports total_blob_bytes as a single series')
     t.ok(totalBytesLine.endsWith(' 0'), 'total_blob_bytes is 0 on an empty registry')
 
-    const modelsTotalLine = body.split('\n')
-      .find(line => line.startsWith('qvac_registry_models_total '))
-    t.ok(modelsTotalLine, 'exports models_total as a single series')
-    t.ok(modelsTotalLine.endsWith(' 0'), 'models_total is 0 on an empty registry')
+    const modelCountLine = body.split('\n')
+      .find(line => line.startsWith('qvac_registry_model_count '))
+    t.ok(modelCountLine, 'exports model_count as a single series')
+    t.ok(modelCountLine.endsWith(' 0'), 'model_count is 0 on an empty registry')
 
+    t.absent(body.includes('qvac_registry_models_total'), 'legacy models_total name is removed')
+    t.absent(body.includes('qvac_registry_blob_cores_total'), 'legacy blob_cores_total name is removed')
     t.absent(body.includes('qvac_registry_model_size_bytes'), 'per-path model_size_bytes metric is removed')
+
+    const rpcPingRequests = body.split('\n')
+      .find(line => line.startsWith('qvac_registry_rpc_requests_total{method="ping"}'))
+    t.ok(rpcPingRequests, 'rpc_requests_total{method="ping"} series is pre-initialised')
+    t.ok(rpcPingRequests.endsWith(' 0'), 'rpc_requests_total{method="ping"} starts at 0')
+
+    const rpcPingErrors = body.split('\n')
+      .find(line => line.startsWith('qvac_registry_rpc_errors_total{method="add-model"}'))
+    t.ok(rpcPingErrors, 'rpc_errors_total{method="add-model"} series is pre-initialised')
+    t.ok(rpcPingErrors.endsWith(' 0'), 'rpc_errors_total{method="add-model"} starts at 0')
   } finally {
     await cleanup(ctx)
   }
