@@ -115,8 +115,10 @@ test('/metrics includes QVAC custom gauges', async (t) => {
     t.ok(body.includes('qvac_registry_total_blob_bytes'), 'has total_blob_bytes')
     t.ok(body.includes('qvac_registry_totals_refreshed_age_seconds'), 'has totals_refreshed_age_seconds')
     t.ok(body.includes('qvac_registry_blob_core_count'), 'has blob_core_count')
+    t.ok(body.includes('qvac_registry_blob_core_seeders'), 'has blob_core_seeders')
     t.ok(body.includes('qvac_registry_view_core_length'), 'has view_core_length')
     t.ok(body.includes('qvac_registry_view_core_contiguous_length'), 'has view_core_contiguous_length')
+    t.ok(body.includes('qvac_registry_view_core_seeders'), 'has view_core_seeders')
     t.ok(body.includes('qvac_registry_is_indexer'), 'has is_indexer')
     t.ok(body.includes('qvac_registry_blind_peers_connected'), 'has blind_peers_connected')
     t.ok(body.includes('qvac_registry_blind_peer_connected'), 'has blind_peer_connected')
@@ -136,6 +138,11 @@ test('/metrics includes QVAC custom gauges', async (t) => {
     t.absent(body.includes('qvac_registry_models_total'), 'legacy models_total name is removed')
     t.absent(body.includes('qvac_registry_blob_cores_total'), 'legacy blob_cores_total name is removed')
     t.absent(body.includes('qvac_registry_model_size_bytes'), 'per-path model_size_bytes metric is removed')
+
+    const viewSeedersLine = body.split('\n')
+      .find(line => line.startsWith('qvac_registry_view_core_seeders '))
+    t.ok(viewSeedersLine, 'exports view_core_seeders as a single series')
+    t.ok(viewSeedersLine.endsWith(' 0'), 'view_core_seeders is 0 with no connected peers')
 
     const rpcPingRequests = body.split('\n')
       .find(line => line.startsWith('qvac_registry_rpc_requests_total{method="ping"}'))

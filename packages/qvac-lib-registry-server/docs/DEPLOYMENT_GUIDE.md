@@ -562,11 +562,13 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_total_blob_bytes` | Gauge | Sum of `blobBinding.byteLength` across every model record in the view |
 | `qvac_registry_totals_refreshed_age_seconds` | Gauge | Seconds since `total_blob_bytes` / `model_count` were last recomputed (-1 if never) |
 | `qvac_registry_blob_core_count` | Gauge | Number of blob cores opened locally on this node |
-| `qvac_registry_blob_core_peers` | Gauge | Connected peers per blob core |
-| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether each blob core is fully replicated |
+| `qvac_registry_blob_core_peers` | Gauge | Connected peers per blob core (may be partial replicas) |
+| `qvac_registry_blob_core_seeders` | Gauge | Peers per blob core that hold it fully and are uploading (full replicas) |
+| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether each blob core is fully replicated locally |
 | `qvac_registry_blob_core_byte_length` | Gauge | Byte length per locally-opened blob core |
 | `qvac_registry_view_core_length` | Gauge | View core length (total blocks) |
 | `qvac_registry_view_core_contiguous_length` | Gauge | View core contiguous length (gap indicates replication lag) |
+| `qvac_registry_view_core_seeders` | Gauge | Peers holding the view core fully and willing to upload (full replicas in the swarm) |
 | `qvac_registry_rpc_requests_total` | Counter | RPC requests by method |
 | `qvac_registry_rpc_errors_total` | Counter | RPC errors by method |
 | `qvac_registry_is_indexer` | Gauge | Whether this node is an indexer |
@@ -574,6 +576,10 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_blind_peer_connected` | Gauge | Per-blind-peer connection status (labeled by `peer_key`) |
 
 `qvac_registry_total_blob_bytes` is derived from the view, not from the on-disk blob cores, so it reports the logical registry size consistently on every node (indexers that do not store blobs locally still report the same value).
+
+`qvac_registry_blob_core_*` metrics are populated on writer/indexer nodes — the blob core is opened eagerly at startup. Reader-only nodes that don't hold writer state do not open the blob core locally and will export empty series for these labels.
+
+`*_seeders` count peers whose replication handshake has completed, who advertise `remoteUploading`, and whose `remoteContiguousLength` covers the local core length. For the view core they converge to the number of connected replicating peers within an RTT because the view is small (a few MB of autobase metadata); for blob cores the gap `peers - seeders` indicates peers currently downloading rather than serving.
 
 **Prometheus scrape config (local Prometheus, loopback bind):**
 
@@ -656,6 +662,7 @@ Use Holepunch's pre-built [Grafana dashboard](https://grafana.com/grafana/dashbo
 
 - **Model availability:** `qvac_registry_model_count`, `hyper_health_peers_with_all_data_total`
 - **Storage:** `qvac_registry_total_blob_bytes` (view-derived logical size), `sum(qvac_registry_blob_core_byte_length)` (on-disk per node)
+- **Replication durability:** `qvac_registry_view_core_seeders`, `qvac_registry_blob_core_seeders` — alert when either drops below a redundancy floor (e.g. `< 2`). Gap between `blob_core_peers` and `blob_core_seeders` surfaces peers mid-download.
 - **RPC activity:** `rate(qvac_registry_rpc_requests_total[5m])`, error ratio
 - **Cluster health:** `qvac_registry_is_indexer` across nodes, `qvac_registry_view_core_length` vs `qvac_registry_view_core_contiguous_length`
 - **Metric freshness:** `qvac_registry_totals_refreshed_age_seconds` — alert if it exceeds 15 minutes (background refresh runs every 5)

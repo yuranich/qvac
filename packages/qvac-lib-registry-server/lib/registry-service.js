@@ -258,6 +258,19 @@ class RegistryService extends ReadyResource {
       await this._setupBlindPeering()
     }
 
+    // Eagerly open the blob core on writer/indexer nodes so that per-core
+    // metrics (peers, seeders, byte length) and on-disk replication health
+    // are observable immediately, without waiting for the first addModel RPC
+    // or for blind-peering setup to run. On reader-only nodes we skip this,
+    // because `writable: true` would create a local core with the wrong key.
+    if (this.base.isIndexer || this.base.localWriter) {
+      try {
+        await this._getOrCreateBlobsCore(BLOB_CORE_NAME)
+      } catch (err) {
+        this.logger.warn({ err: err.message }, 'RegistryService: failed to open blob core at startup')
+      }
+    }
+
     if (this.compactionIntervalMs > 0) {
       this._startCompactionInterval()
     }

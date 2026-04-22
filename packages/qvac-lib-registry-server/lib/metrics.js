@@ -137,6 +137,15 @@ class QvacMetrics {
 
     // eslint-disable-next-line no-new
     new promClient.Gauge({
+      name: 'qvac_registry_view_core_seeders',
+      help: 'Peers that hold the view core fully and are willing to upload (full replicas available in the swarm)',
+      collect () {
+        this.set(countSeeders(self._service.view?.core))
+      }
+    })
+
+    // eslint-disable-next-line no-new
+    new promClient.Gauge({
       name: 'qvac_registry_is_indexer',
       help: 'Whether this node is an indexer (1=yes, 0=no)',
       collect () {
@@ -181,7 +190,34 @@ class QvacMetrics {
         }
       }
     })
+
+    // eslint-disable-next-line no-new
+    new promClient.Gauge({
+      name: 'qvac_registry_blob_core_seeders',
+      help: 'Peers per blob core that hold it fully and are uploading (full replicas)',
+      labelNames: ['core_name'],
+      collect () {
+        this.reset()
+        for (const [name, { core }] of self._service.blobsCores) {
+          this.set({ core_name: name }, countSeeders(core))
+        }
+      }
+    })
   }
+}
+
+// A peer is a "seeder" for a core when the replication handshake has opened,
+// the remote has advertised willingness to upload, and the remote's contiguous
+// length covers the core's current length. `remoteContiguousLength` is zero
+// until the handshake completes, so the `remoteOpened` check avoids counting
+// partially-initialised peers as full replicas.
+function countSeeders (core) {
+  if (!core || !Array.isArray(core.peers) || core.length === 0) return 0
+  let n = 0
+  for (const p of core.peers) {
+    if (p.remoteOpened && p.remoteUploading && p.remoteContiguousLength >= core.length) n++
+  }
+  return n
 }
 
 module.exports = QvacMetrics
