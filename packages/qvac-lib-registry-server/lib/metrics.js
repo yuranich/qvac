@@ -49,8 +49,7 @@ class QvacMetrics {
   _registerGauges () {
     const self = this
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_model_count',
       help: 'Number of models in the registry',
       collect () {
@@ -58,8 +57,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_total_blob_bytes',
       help: 'Total bytes across all model blobs (sum of blobBinding.byteLength across view records)',
       collect () {
@@ -69,8 +67,7 @@ class QvacMetrics {
 
     // Derived from totalModelBytes via a background refresh; expose staleness so
     // operators can alert when the refresh stalls.
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_totals_refreshed_age_seconds',
       help: 'Seconds since qvac_registry_total_blob_bytes and qvac_registry_model_count were last recomputed (-1 if never)',
       collect () {
@@ -79,8 +76,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blob_core_count',
       help: 'Number of blob cores opened locally on this node',
       collect () {
@@ -88,8 +84,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blob_core_peers',
       help: 'Number of connected peers per blob core',
       labelNames: ['core_name'],
@@ -101,8 +96,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blob_core_fully_downloaded',
       help: 'Whether each blob core is fully downloaded (1=yes, 0=no)',
       labelNames: ['core_name'],
@@ -115,8 +109,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_view_core_length',
       help: 'View core length (total blocks)',
       collect () {
@@ -125,8 +118,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_view_core_contiguous_length',
       help: 'View core contiguous length (gap = length - contiguous indicates replication lag)',
       collect () {
@@ -135,8 +127,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_view_core_seeders',
       help: 'Peers that hold the view core fully and are willing to upload (full replicas available in the swarm)',
       collect () {
@@ -144,8 +135,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_is_indexer',
       help: 'Whether this node is an indexer (1=yes, 0=no)',
       collect () {
@@ -153,8 +143,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blind_peers_connected',
       help: 'Number of configured blind peers with an active connection',
       collect () {
@@ -162,8 +151,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blind_peer_connected',
       help: 'Whether each configured blind peer currently has an active connection (1=yes, 0=no)',
       labelNames: ['peer_key'],
@@ -178,8 +166,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blob_core_byte_length',
       help: 'Byte length of each blob core (only populated on nodes that opened the blob core locally)',
       labelNames: ['core_name'],
@@ -191,8 +178,7 @@ class QvacMetrics {
       }
     })
 
-    // eslint-disable-next-line no-new
-    new promClient.Gauge({
+    registerGauge({
       name: 'qvac_registry_blob_core_seeders',
       help: 'Peers per blob core that hold it fully and are uploading (full replicas)',
       labelNames: ['core_name'],
@@ -204,6 +190,14 @@ class QvacMetrics {
       }
     })
   }
+}
+
+// prom-client's Gauge constructor self-registers on the default registry as
+// a side effect; `collect`-driven gauges never need the returned reference.
+// Wrapping the `new` in a function call lets standardjs's `no-new` rule
+// pass without scattering disable directives.
+function registerGauge (opts) {
+  return new promClient.Gauge(opts)
 }
 
 // A peer is a "seeder" for a core when the replication handshake has opened,
