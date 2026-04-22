@@ -188,10 +188,6 @@ function firstBlobCore (service) {
   return iter.done ? null : iter.value.core
 }
 
-// prom-client's Gauge constructor self-registers on the default registry as
-// a side effect; `collect`-driven gauges never need the returned reference.
-// Wrapping the `new` in a function call lets standardjs's `no-new` rule
-// pass without scattering disable directives.
 function registerGauge (opts) {
   return new promClient.Gauge(opts)
 }
