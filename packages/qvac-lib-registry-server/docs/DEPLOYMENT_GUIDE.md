@@ -562,10 +562,10 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_total_blob_bytes` | Gauge | Sum of `blobBinding.byteLength` across every model record in the view |
 | `qvac_registry_totals_refreshed_age_seconds` | Gauge | Seconds since `total_blob_bytes` / `model_count` were last recomputed (-1 if never) |
 | `qvac_registry_blob_core_count` | Gauge | Number of blob cores opened locally on this node |
-| `qvac_registry_blob_core_peers` | Gauge | Connected peers per blob core (may be partial replicas) |
-| `qvac_registry_blob_core_seeders` | Gauge | Peers per blob core that hold it fully and are uploading (full replicas) |
-| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether each blob core is fully replicated locally |
-| `qvac_registry_blob_core_byte_length` | Gauge | Byte length per locally-opened blob core |
+| `qvac_registry_blob_core_peers` | Gauge | Peers connected to this node's local blob core (may be partial replicas) |
+| `qvac_registry_blob_core_seeders` | Gauge | Peers holding this node's local blob core fully and uploading (full replicas) |
+| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether this node's local blob core is fully replicated (1/0) |
+| `qvac_registry_blob_core_byte_length` | Gauge | Byte length of this node's local blob core |
 | `qvac_registry_view_core_length` | Gauge | View core length (total blocks) |
 | `qvac_registry_view_core_contiguous_length` | Gauge | View core contiguous length (gap indicates replication lag) |
 | `qvac_registry_view_core_seeders` | Gauge | Peers holding the view core fully and willing to upload (full replicas in the swarm) |
@@ -577,7 +577,9 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 
 `qvac_registry_total_blob_bytes` is derived from the view, not from the on-disk blob cores, so it reports the logical registry size consistently on every node (indexers that do not store blobs locally still report the same value).
 
-`qvac_registry_blob_core_*` metrics are populated on writer/indexer nodes — the blob core is opened eagerly at startup. Reader-only nodes that don't hold writer state do not open the blob core locally and will export empty series for these labels.
+`qvac_registry_blob_core_*` metrics are populated on writer/indexer nodes — the blob core is opened eagerly at startup. Reader-only nodes that don't hold writer state do not open the blob core locally and will export `0` for these gauges. Each indexer owns exactly one writable blob core namespaced to its own primary key, so these metrics are single-series per node; Prometheus's automatic `instance` label distinguishes nodes at scrape time.
+
+**Multi-indexer dashboards:** view-derived metrics (`qvac_registry_model_count`, `qvac_registry_total_blob_bytes`, `qvac_registry_totals_refreshed_age_seconds`) report the same value on every indexer because the view is authoritative and identical cluster-wide. For single-stat panels use `quantile(0.5, …)` or `avg(…)` to collapse to one value without triple-counting. On-disk metrics (`qvac_registry_blob_core_byte_length`, `qvac_registry_blob_core_peers`, `qvac_registry_blob_core_seeders`) are per-node and should be displayed per `instance` or summed for cluster totals.
 
 `*_seeders` count peers whose replication handshake has completed, who advertise `remoteUploading`, and whose `remoteContiguousLength` covers the local core length. For the view core they converge to the number of connected replicating peers within an RTT because the view is small (a few MB of autobase metadata); for blob cores the gap `peers - seeders` indicates peers currently downloading rather than serving.
 

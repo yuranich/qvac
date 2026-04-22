@@ -1062,7 +1062,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_model_count",
+          "expr": "quantile(0.5, qvac_registry_model_count)",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1373,7 +1373,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_total_blob_bytes",
+          "expr": "quantile(0.5, qvac_registry_total_blob_bytes)",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1461,17 +1461,17 @@
       "targets": [
         {
           "expr": "qvac_registry_view_core_length",
-          "legendFormat": "length",
+          "legendFormat": "{{instance}} length",
           "refId": "A"
         },
         {
           "expr": "qvac_registry_view_core_contiguous_length",
-          "legendFormat": "contiguous",
+          "legendFormat": "{{instance}} contiguous",
           "refId": "B"
         },
         {
           "expr": "qvac_registry_view_core_length - qvac_registry_view_core_contiguous_length",
-          "legendFormat": "gap (replication lag)",
+          "legendFormat": "{{instance}} gap",
           "refId": "C"
         }
       ],
@@ -1558,7 +1558,7 @@
       "targets": [
         {
           "expr": "qvac_registry_blob_core_peers",
-          "legendFormat": "{{core_name}}",
+          "legendFormat": "{{instance}}",
           "refId": "A"
         }
       ],

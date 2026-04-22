@@ -84,28 +84,25 @@ class QvacMetrics {
       }
     })
 
+    // Each indexer owns exactly one writable blob core (namespaced on its
+    // own primary key), so per-node blob-core metrics are single-series and
+    // don't need an extra label - Prometheus's automatic `instance` label
+    // distinguishes nodes at scrape time.
     registerGauge({
       name: 'qvac_registry_blob_core_peers',
-      help: 'Number of connected peers per blob core',
-      labelNames: ['core_name'],
+      help: 'Number of peers connected to this node\'s local blob core (may be partial replicas)',
       collect () {
-        this.reset()
-        for (const [name, { core }] of self._service.blobsCores) {
-          this.set({ core_name: name }, core.peers.length)
-        }
+        this.set(firstBlobCore(self._service)?.peers.length ?? 0)
       }
     })
 
     registerGauge({
       name: 'qvac_registry_blob_core_fully_downloaded',
-      help: 'Whether each blob core is fully downloaded (1=yes, 0=no)',
-      labelNames: ['core_name'],
+      help: 'Whether this node\'s local blob core is fully downloaded (1=yes, 0=no)',
       collect () {
-        this.reset()
-        for (const [name, { core }] of self._service.blobsCores) {
-          const full = core.contiguousLength === core.length && core.length > 0 ? 1 : 0
-          this.set({ core_name: name }, full)
-        }
+        const core = firstBlobCore(self._service)
+        if (!core || core.length === 0) { this.set(0); return }
+        this.set(core.contiguousLength === core.length ? 1 : 0)
       }
     })
 
@@ -168,28 +165,27 @@ class QvacMetrics {
 
     registerGauge({
       name: 'qvac_registry_blob_core_byte_length',
-      help: 'Byte length of each blob core (only populated on nodes that opened the blob core locally)',
-      labelNames: ['core_name'],
+      help: 'Byte length of this node\'s local blob core (only populated on nodes that opened the blob core locally)',
       collect () {
-        this.reset()
-        for (const [name, { core }] of self._service.blobsCores) {
-          this.set({ core_name: name }, core.byteLength)
-        }
+        this.set(firstBlobCore(self._service)?.byteLength ?? 0)
       }
     })
 
     registerGauge({
       name: 'qvac_registry_blob_core_seeders',
-      help: 'Peers per blob core that hold it fully and are uploading (full replicas)',
-      labelNames: ['core_name'],
+      help: 'Peers holding this node\'s local blob core fully and willing to upload (full replicas)',
       collect () {
-        this.reset()
-        for (const [name, { core }] of self._service.blobsCores) {
-          this.set({ core_name: name }, countSeeders(core))
-        }
+        this.set(countSeeders(firstBlobCore(self._service)))
       }
     })
   }
+}
+
+// Each indexer owns at most one writable blob core; this helper returns it
+// or null when the node is a reader that hasn't opened the core locally.
+function firstBlobCore (service) {
+  const iter = service.blobsCores.values().next()
+  return iter.done ? null : iter.value.core
 }
 
 // prom-client's Gauge constructor self-registers on the default registry as
