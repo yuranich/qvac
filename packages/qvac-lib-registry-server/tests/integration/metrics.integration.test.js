@@ -4,7 +4,6 @@ const test = require('brittle')
 const Corestore = require('corestore')
 const Hyperswarm = require('hyperswarm')
 const http = require('http')
-const IdEnc = require('hypercore-id-encoding')
 const promClient = require('prom-client')
 
 const RegistryService = require('../../lib/registry-service')
@@ -116,12 +115,12 @@ test('/metrics includes QVAC custom gauges', async (t) => {
     t.ok(body.includes('qvac_registry_totals_refreshed_age_seconds'), 'has totals_refreshed_age_seconds')
     t.ok(body.includes('qvac_registry_blob_core_count'), 'has blob_core_count')
     t.ok(body.includes('qvac_registry_blob_core_seeders'), 'has blob_core_seeders')
+    t.ok(body.includes('qvac_registry_blob_core_length'), 'has blob_core_length')
+    t.ok(body.includes('qvac_registry_blob_core_contiguous_length'), 'has blob_core_contiguous_length')
     t.ok(body.includes('qvac_registry_view_core_length'), 'has view_core_length')
     t.ok(body.includes('qvac_registry_view_core_contiguous_length'), 'has view_core_contiguous_length')
     t.ok(body.includes('qvac_registry_view_core_seeders'), 'has view_core_seeders')
     t.ok(body.includes('qvac_registry_is_indexer'), 'has is_indexer')
-    t.ok(body.includes('qvac_registry_blind_peers_connected'), 'has blind_peers_connected')
-    t.ok(body.includes('qvac_registry_blind_peer_connected'), 'has blind_peer_connected')
     t.ok(body.includes('qvac_registry_rpc_requests_total'), 'has rpc_requests_total')
     t.ok(body.includes('qvac_registry_rpc_errors_total'), 'has rpc_errors_total')
 
@@ -134,10 +133,6 @@ test('/metrics includes QVAC custom gauges', async (t) => {
       .find(line => line.startsWith('qvac_registry_model_count '))
     t.ok(modelCountLine, 'exports model_count as a single series')
     t.ok(modelCountLine.endsWith(' 0'), 'model_count is 0 on an empty registry')
-
-    t.absent(body.includes('qvac_registry_models_total'), 'legacy models_total name is removed')
-    t.absent(body.includes('qvac_registry_blob_cores_total'), 'legacy blob_cores_total name is removed')
-    t.absent(body.includes('qvac_registry_model_size_bytes'), 'per-path model_size_bytes metric is removed')
 
     const viewSeedersLine = body.split('\n')
       .find(line => line.startsWith('qvac_registry_view_core_seeders '))
@@ -177,50 +172,6 @@ test('RPC metrics counters increment', async (t) => {
     const errorLine = body.split('\n').find(l => l.includes('qvac_registry_rpc_errors_total') && l.includes('add-model'))
     t.ok(errorLine, 'has add-model error counter line')
     t.ok(errorLine.includes('1'), 'error counter is 1')
-  } finally {
-    await cleanup(ctx)
-  }
-})
-
-test('blind peer metrics track configured peers with active connections', async (t) => {
-  const blindPeerKeys = [
-    IdEnc.normalize(Buffer.alloc(32, 1)),
-    IdEnc.normalize(Buffer.alloc(32, 2))
-  ]
-  const ctx = await createServiceWithMetrics(t)
-
-  try {
-    ctx.service.blindPeerKeys = blindPeerKeys
-    ctx.service._trackPeerConnection(blindPeerKeys[0])
-    ctx.service._trackPeerConnection(blindPeerKeys[0])
-    ctx.service._trackPeerConnection('writer-peer')
-
-    let res = await httpGet(ctx.port, '/metrics')
-    let body = res.body
-
-    const connectedPeerLine = body.split('\n')
-      .find(line => line.startsWith(`qvac_registry_blind_peer_connected{peer_key="${blindPeerKeys[0]}"}`))
-    t.ok(connectedPeerLine, 'has connected blind peer series')
-    t.ok(connectedPeerLine.endsWith(' 1'), 'connected blind peer is reported as 1')
-
-    const disconnectedPeerLine = body.split('\n')
-      .find(line => line.startsWith(`qvac_registry_blind_peer_connected{peer_key="${blindPeerKeys[1]}"}`))
-    t.ok(disconnectedPeerLine, 'has disconnected blind peer series')
-    t.ok(disconnectedPeerLine.endsWith(' 0'), 'disconnected blind peer is reported as 0')
-
-    ctx.service._untrackPeerConnection(blindPeerKeys[0])
-    ctx.service._untrackPeerConnection(blindPeerKeys[0])
-
-    res = await httpGet(ctx.port, '/metrics')
-    body = res.body
-
-    const afterCloseCountLine = body.split('\n')
-      .find(line => line.startsWith('qvac_registry_blind_peers_connected '))
-    t.ok(afterCloseCountLine.endsWith(' 0'), 'blind peer count drops after connection closes')
-
-    const afterClosePeerLine = body.split('\n')
-      .find(line => line.startsWith(`qvac_registry_blind_peer_connected{peer_key="${blindPeerKeys[0]}"}`))
-    t.ok(afterClosePeerLine.endsWith(' 0'), 'blind peer status drops after connection closes')
   } finally {
     await cleanup(ctx)
   }

@@ -97,12 +97,18 @@ class QvacMetrics {
     })
 
     registerGauge({
-      name: 'qvac_registry_blob_core_fully_downloaded',
-      help: 'Whether this node\'s local blob core is fully downloaded (1=yes, 0=no)',
+      name: 'qvac_registry_blob_core_length',
+      help: 'This node\'s local blob core length (total blocks)',
       collect () {
-        const core = firstBlobCore(self._service)
-        if (!core || core.length === 0) { this.set(0); return }
-        this.set(core.contiguousLength === core.length ? 1 : 0)
+        this.set(firstBlobCore(self._service)?.length ?? 0)
+      }
+    })
+
+    registerGauge({
+      name: 'qvac_registry_blob_core_contiguous_length',
+      help: 'This node\'s local blob core contiguous length (gap = length - contiguous indicates missing blocks on disk)',
+      collect () {
+        this.set(firstBlobCore(self._service)?.contiguousLength ?? 0)
       }
     })
 
@@ -137,29 +143,6 @@ class QvacMetrics {
       help: 'Whether this node is an indexer (1=yes, 0=no)',
       collect () {
         this.set(self._service.base?.isIndexer ? 1 : 0)
-      }
-    })
-
-    registerGauge({
-      name: 'qvac_registry_blind_peers_connected',
-      help: 'Number of configured blind peers with an active connection',
-      collect () {
-        this.set(self._service.getConnectedBlindPeerKeys().length)
-      }
-    })
-
-    registerGauge({
-      name: 'qvac_registry_blind_peer_connected',
-      help: 'Whether each configured blind peer currently has an active connection (1=yes, 0=no)',
-      labelNames: ['peer_key'],
-      collect () {
-        this.reset()
-        for (const peerKey of self._service.getConfiguredBlindPeerKeys()) {
-          this.set(
-            { peer_key: peerKey },
-            self._service.isBlindPeerConnected(peerKey) ? 1 : 0
-          )
-        }
       }
     })
 

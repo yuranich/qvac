@@ -564,7 +564,8 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_blob_core_count` | Gauge | Number of blob cores opened locally on this node |
 | `qvac_registry_blob_core_peers` | Gauge | Peers connected to this node's local blob core (may be partial replicas) |
 | `qvac_registry_blob_core_seeders` | Gauge | Peers holding this node's local blob core fully and uploading (full replicas) |
-| `qvac_registry_blob_core_fully_downloaded` | Gauge | Whether this node's local blob core is fully replicated (1/0) |
+| `qvac_registry_blob_core_length` | Gauge | This node's local blob core length in blocks |
+| `qvac_registry_blob_core_contiguous_length` | Gauge | Blob core contiguous length in blocks (gap indicates missing blocks on disk) |
 | `qvac_registry_blob_core_byte_length` | Gauge | Byte length of this node's local blob core |
 | `qvac_registry_view_core_length` | Gauge | View core length (total blocks) |
 | `qvac_registry_view_core_contiguous_length` | Gauge | View core contiguous length (gap indicates replication lag) |
@@ -572,8 +573,6 @@ node scripts/bin.js run --storage ./corestore --metrics-port 0
 | `qvac_registry_rpc_requests_total` | Counter | RPC requests by method |
 | `qvac_registry_rpc_errors_total` | Counter | RPC errors by method |
 | `qvac_registry_is_indexer` | Gauge | Whether this node is an indexer |
-| `qvac_registry_blind_peers_connected` | Gauge | Number of configured blind peers with an active connection |
-| `qvac_registry_blind_peer_connected` | Gauge | Per-blind-peer connection status (labeled by `peer_key`) |
 
 `qvac_registry_total_blob_bytes` is derived from the view, not from the on-disk blob cores, so it reports the logical registry size consistently on every node (indexers that do not store blobs locally still report the same value).
 
