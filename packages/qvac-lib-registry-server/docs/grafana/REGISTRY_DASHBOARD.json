@@ -1403,17 +1403,17 @@
       "targets": [
         {
           "expr": "qvac_registry_view_core_length",
-          "legendFormat": "{{instance}} length",
+          "legendFormat": "{{ vm_name }} length",
           "refId": "A"
         },
         {
           "expr": "qvac_registry_view_core_contiguous_length",
-          "legendFormat": "{{instance}} contiguous",
+          "legendFormat": "{{ vm_name }} contiguous",
           "refId": "B"
         },
         {
           "expr": "qvac_registry_view_core_length - qvac_registry_view_core_contiguous_length",
-          "legendFormat": "{{instance}} gap",
+          "legendFormat": "{{ vm_name }} gap",
           "refId": "C"
         }
       ],
@@ -1500,7 +1500,7 @@
       "targets": [
         {
           "expr": "qvac_registry_blob_core_peers",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
       ],
@@ -1910,17 +1910,17 @@
       "targets": [
         {
           "expr": "qvac_registry_blob_core_length",
-          "legendFormat": "{{instance}} length",
+          "legendFormat": "{{ vm_name }} length",
           "refId": "A"
         },
         {
           "expr": "qvac_registry_blob_core_contiguous_length",
-          "legendFormat": "{{instance}} contiguous",
+          "legendFormat": "{{ vm_name }} contiguous",
           "refId": "B"
         },
         {
           "expr": "qvac_registry_blob_core_length - qvac_registry_blob_core_contiguous_length",
-          "legendFormat": "{{instance}} gap",
+          "legendFormat": "{{ vm_name }} gap",
           "refId": "C"
         }
       ],
@@ -2007,12 +2007,12 @@
       "targets": [
         {
           "expr": "qvac_registry_view_core_seeders",
-          "legendFormat": "{{instance}} view",
+          "legendFormat": "{{ vm_name }} view",
           "refId": "A"
         },
         {
           "expr": "qvac_registry_blob_core_seeders",
-          "legendFormat": "{{instance}} blob",
+          "legendFormat": "{{ vm_name }} blob",
           "refId": "B"
         }
       ],
@@ -2100,7 +2100,7 @@
       "targets": [
         {
           "expr": "qvac_registry_blob_core_byte_length",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
       ],
@@ -2552,7 +2552,7 @@
       "targets": [
         {
           "expr": "hyperswarm_nr_peers",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
       ],
@@ -2640,7 +2640,7 @@
       "targets": [
         {
           "expr": "hypercore_round_trip_time_avg_seconds",
-          "legendFormat": "{{instance}}",
+          "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
       ],
@@ -2727,22 +2727,22 @@
       "targets": [
         {
           "expr": "rate(hyperswarm_client_connections_opened[5m])",
-          "legendFormat": "{{instance}} client-opened",
+          "legendFormat": "{{ vm_name }} client-opened",
           "refId": "A"
         },
         {
           "expr": "rate(hyperswarm_server_connections_opened[5m])",
-          "legendFormat": "{{instance}} server-opened",
+          "legendFormat": "{{ vm_name }} server-opened",
           "refId": "B"
         },
         {
           "expr": "rate(hyperswarm_client_connections_closed[5m])",
-          "legendFormat": "{{instance}} client-closed",
+          "legendFormat": "{{ vm_name }} client-closed",
           "refId": "C"
         },
         {
           "expr": "rate(hyperswarm_server_connections_closed[5m])",
-          "legendFormat": "{{instance}} server-closed",
+          "legendFormat": "{{ vm_name }} server-closed",
           "refId": "D"
         }
       ],
@@ -2830,12 +2830,12 @@
       "targets": [
         {
           "expr": "rate(hypercore_total_wire_data_transmitted[5m])",
-          "legendFormat": "{{instance}} tx",
+          "legendFormat": "{{ vm_name }} tx",
           "refId": "A"
         },
         {
           "expr": "rate(hypercore_total_wire_data_received[5m])",
-          "legendFormat": "{{instance}} rx",
+          "legendFormat": "{{ vm_name }} rx",
           "refId": "B"
         }
       ],
@@ -2923,12 +2923,12 @@
       "targets": [
         {
           "expr": "rate(udx_total_bytes_transmitted[5m])",
-          "legendFormat": "{{instance}} tx",
+          "legendFormat": "{{ vm_name }} tx",
           "refId": "A"
         },
         {
           "expr": "rate(udx_total_bytes_received[5m])",
-          "legendFormat": "{{instance}} rx",
+          "legendFormat": "{{ vm_name }} rx",
           "refId": "B"
         }
       ],
@@ -3015,12 +3015,12 @@
       "targets": [
         {
           "expr": "rate(dht_total_queries[5m])",
-          "legendFormat": "{{instance}} queries",
+          "legendFormat": "{{ vm_name }} queries",
           "refId": "A"
         },
         {
           "expr": "rate(dht_total_requests[5m])",
-          "legendFormat": "{{instance}} requests",
+          "legendFormat": "{{ vm_name }} requests",
           "refId": "B"
         }
       ],
