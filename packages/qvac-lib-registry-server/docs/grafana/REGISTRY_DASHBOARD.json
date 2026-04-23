@@ -1062,7 +1062,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "quantile(0.5, qvac_registry_model_count)",
+          "expr": "quantile(0.5, qvac_registry_model_count{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1134,7 +1134,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_is_indexer",
+          "expr": "qvac_registry_is_indexer{vm_name=~\"$vm\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1188,7 +1188,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_blob_core_count",
+          "expr": "qvac_registry_blob_core_count{vm_name=~\"$vm\"}",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1260,7 +1260,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "min(qvac_registry_blob_core_contiguous_length == bool qvac_registry_blob_core_length) and min(qvac_registry_blob_core_length) > bool 0",
+          "expr": "min(qvac_registry_blob_core_contiguous_length{vm_name=~\"$vm\"} == bool qvac_registry_blob_core_length{vm_name=~\"$vm\"}) and min(qvac_registry_blob_core_length{vm_name=~\"$vm\"}) > bool 0",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1315,7 +1315,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "quantile(0.5, qvac_registry_total_blob_bytes)",
+          "expr": "quantile(0.5, qvac_registry_total_blob_bytes{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1402,17 +1402,17 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_view_core_length",
+          "expr": "qvac_registry_view_core_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} length",
           "refId": "A"
         },
         {
-          "expr": "qvac_registry_view_core_contiguous_length",
+          "expr": "qvac_registry_view_core_contiguous_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} contiguous",
           "refId": "B"
         },
         {
-          "expr": "qvac_registry_view_core_length - qvac_registry_view_core_contiguous_length",
+          "expr": "qvac_registry_view_core_length{vm_name=~\"$vm\"} - qvac_registry_view_core_contiguous_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} gap",
           "refId": "C"
         }
@@ -1499,7 +1499,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_blob_core_peers",
+          "expr": "qvac_registry_blob_core_peers{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
@@ -1586,7 +1586,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(qvac_registry_rpc_requests_total[5m])",
+          "expr": "rate(qvac_registry_rpc_requests_total{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{method}}",
           "refId": "A"
         }
@@ -1677,7 +1677,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(qvac_registry_rpc_errors_total[5m])",
+          "expr": "rate(qvac_registry_rpc_errors_total{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{method}}",
           "refId": "A"
         }
@@ -1822,7 +1822,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "max(qvac_registry_totals_refreshed_age_seconds)",
+          "expr": "max(qvac_registry_totals_refreshed_age_seconds{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -1909,17 +1909,17 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_blob_core_length",
+          "expr": "qvac_registry_blob_core_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} length",
           "refId": "A"
         },
         {
-          "expr": "qvac_registry_blob_core_contiguous_length",
+          "expr": "qvac_registry_blob_core_contiguous_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} contiguous",
           "refId": "B"
         },
         {
-          "expr": "qvac_registry_blob_core_length - qvac_registry_blob_core_contiguous_length",
+          "expr": "qvac_registry_blob_core_length{vm_name=~\"$vm\"} - qvac_registry_blob_core_contiguous_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} gap",
           "refId": "C"
         }
@@ -2006,12 +2006,12 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_view_core_seeders",
+          "expr": "qvac_registry_view_core_seeders{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} view",
           "refId": "A"
         },
         {
-          "expr": "qvac_registry_blob_core_seeders",
+          "expr": "qvac_registry_blob_core_seeders{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }} blob",
           "refId": "B"
         }
@@ -2099,7 +2099,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "qvac_registry_blob_core_byte_length",
+          "expr": "qvac_registry_blob_core_byte_length{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
@@ -2174,7 +2174,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "sum(hyperswarm_nr_peers)",
+          "expr": "sum(hyperswarm_nr_peers{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2232,7 +2232,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "sum(dht_is_firewalled)",
+          "expr": "sum(dht_is_firewalled{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2290,7 +2290,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "sum(hypercore_invalid_data)",
+          "expr": "sum(hypercore_invalid_data{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2348,7 +2348,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "sum(hypercore_invalid_requests)",
+          "expr": "sum(hypercore_invalid_requests{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2410,7 +2410,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "sum(udx_packets_dropped_total)",
+          "expr": "sum(udx_packets_dropped_total{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2464,7 +2464,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "avg(hyperswarm_avg_congestion_window)",
+          "expr": "avg(hyperswarm_avg_congestion_window{vm_name=~\"$vm\"})",
           "legendFormat": "",
           "refId": "A"
         }
@@ -2551,7 +2551,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "hyperswarm_nr_peers",
+          "expr": "hyperswarm_nr_peers{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
@@ -2639,7 +2639,7 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "hypercore_round_trip_time_avg_seconds",
+          "expr": "hypercore_round_trip_time_avg_seconds{vm_name=~\"$vm\"}",
           "legendFormat": "{{ vm_name }}",
           "refId": "A"
         }
@@ -2726,22 +2726,22 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(hyperswarm_client_connections_opened[5m])",
+          "expr": "rate(hyperswarm_client_connections_opened{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} client-opened",
           "refId": "A"
         },
         {
-          "expr": "rate(hyperswarm_server_connections_opened[5m])",
+          "expr": "rate(hyperswarm_server_connections_opened{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} server-opened",
           "refId": "B"
         },
         {
-          "expr": "rate(hyperswarm_client_connections_closed[5m])",
+          "expr": "rate(hyperswarm_client_connections_closed{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} client-closed",
           "refId": "C"
         },
         {
-          "expr": "rate(hyperswarm_server_connections_closed[5m])",
+          "expr": "rate(hyperswarm_server_connections_closed{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} server-closed",
           "refId": "D"
         }
@@ -2829,12 +2829,12 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(hypercore_total_wire_data_transmitted[5m])",
+          "expr": "rate(hypercore_total_wire_data_transmitted{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} tx",
           "refId": "A"
         },
         {
-          "expr": "rate(hypercore_total_wire_data_received[5m])",
+          "expr": "rate(hypercore_total_wire_data_received{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} rx",
           "refId": "B"
         }
@@ -2922,12 +2922,12 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(udx_total_bytes_transmitted[5m])",
+          "expr": "rate(udx_total_bytes_transmitted{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} tx",
           "refId": "A"
         },
         {
-          "expr": "rate(udx_total_bytes_received[5m])",
+          "expr": "rate(udx_total_bytes_received{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} rx",
           "refId": "B"
         }
@@ -3014,12 +3014,12 @@
       "pluginVersion": "12.4.0",
       "targets": [
         {
-          "expr": "rate(dht_total_queries[5m])",
+          "expr": "rate(dht_total_queries{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} queries",
           "refId": "A"
         },
         {
-          "expr": "rate(dht_total_requests[5m])",
+          "expr": "rate(dht_total_requests{vm_name=~\"$vm\"}[5m])",
           "legendFormat": "{{ vm_name }} requests",
           "refId": "B"
         }
