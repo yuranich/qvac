@@ -253,7 +253,7 @@
     "expo-file-system": "^19.0.15",
     "hyperdb": "^4.19.0",
     "hyperdrive": "^13.0.1",
-    "hyperswarm": "^4.12.1",
+    "hyperswarm": "^4.14.0",
     "llm-splitter": "~0.2.0",
     "pear-pipe": "^1.0.6",
     "react-native-bare-kit": "0.12.3",
