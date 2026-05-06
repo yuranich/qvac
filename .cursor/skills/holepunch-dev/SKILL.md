@@ -152,25 +152,25 @@ swarm.join(drive.discoveryKey)
 
 ## Verified Gotchas
 
-**Policy: Only document verified facts.** Each gotcha is sourced from real production experience. Do NOT invent or speculate about additional gotchas. New gotchas should be added only when encountered and verified in practice.
+**Policy: Only document verified facts.** Each gotcha below is observed in real Holepunch-based production systems and re-verifiable via the Discovery Playbook (upstream README, tests, and source). Do not invent or speculate. Add new gotchas only when encountered and verified in practice.
 
-- **Protomux/RPC registration order**: Register RPC handler BEFORE `store.replicate(conn)`. `store.replicate()` creates a Protomux and immediately processes buffered stream data. If the remote's "open session" message arrives before the protocol handler is registered, Protomux rejects the session → CHANNEL_CLOSED error. Source: registry-implementation-kb.mdc
+- **Protomux/RPC registration order**: Register RPC handler BEFORE `store.replicate(conn)`. `store.replicate()` creates a Protomux and immediately processes buffered stream data. If the remote's "open session" message arrives before the protocol handler is registered, Protomux rejects the session → CHANNEL_CLOSED error.
 
-- **Corestore storage locking**: RocksDB acquires exclusive lock. Each writer needs its own storage directory. Source: registry-implementation-kb.mdc
+- **Corestore storage locking**: RocksDB acquires an exclusive lock per directory. Each writer needs its own storage path.
 
-- **Autobase addWriter/removeWriter**: Only callable from within `apply()` function, not from regular code. Append an operation and handle in apply. Source: registry-implementation-kb.mdc
+- **Autobase addWriter/removeWriter**: Only callable from within `apply()`, not from regular code. Append an operation and handle it in apply.
 
-- **Autobase indexer key access**: Use `indexer.core.key`, not `indexer.key`. Indexer = writer that also materializes the view. Source: registry-implementation-kb.mdc
+- **Autobase indexer key access**: Use `indexer.core.key`, not `indexer.key`. An indexer is a writer that also materializes the view.
 
-- **ReadyResource pattern**: Extend `ready-resource` for classes managing resources or state. Implement `_open()` for initialization, `_close()` for cleanup. Source: main.mdc
+- **ReadyResource pattern**: Extend `ready-resource` for classes managing resources or state. Implement `_open()` for initialization and `_close()` for cleanup.
 
-- **Schema build pipeline order**: Hyperschema first, then HyperDB builder, then Hyperdispatch. All reference `./spec/` directory. Regenerate after schema changes. Source: autopass-knowledge.mdc, registry-implementation-kb.mdc
+- **Schema build pipeline order**: Hyperschema first, then HyperDB builder, then Hyperdispatch. All reference the `./spec/` directory. Regenerate after schema changes.
 
-- **b4a over Buffer**: Use `b4a` (buffer-to-anything) instead of Node.js Buffer for cross-runtime compatibility. Source: Holepunch ecosystem convention, verified in hypercore/autobase code.
+- **b4a over Buffer**: Use `b4a` (buffer-to-anything) instead of Node.js Buffer for cross-runtime compatibility.
 
 ## Scope Boundaries
 
 - Static content in this skill is limited to **non-fetchable knowledge**: the QVAC-oriented P2P taxonomy (extends docs.pears.com with libraries QVAC uses), repo-name anomalies, composition patterns across multiple libraries, and verified production gotchas. Anything discoverable via docs.pears.com or a single `gh api` README fetch does not belong here.
-- Project-specific gotchas belong in `.cursor/rules/` within each project, not in this skill.
+- Project-specific gotchas belong in a project-scoped skill (e.g. `.cursor/skills/registry-autobase-patterns/`) or `.cursor/rules/<project>/`, not in this skill.
 - This skill covers ecosystem-level knowledge and discovery strategy only.
 - If a section starts looking like a paraphrase of an upstream README or the docs.pears.com index, delete it.
