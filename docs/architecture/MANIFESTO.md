@@ -2,7 +2,7 @@
 
 This document declares the non-negotiable architectural properties of QVAC systems. It answers: **what must always be true about how QVAC systems are built, and why?**
 
-These properties are derived from the [QVAC Ecosystem North-Star](https://docs.google.com/document/d/1kmR6aiwLsFjiAl3UPxHROCgYq4XkcCEEve1H_zoR9Lc/edit?tab=t.0) axioms — Independence & Disintermediation, Resilience, Data Sovereignty, and Locality — translated into architectural commitments. They do not prescribe solutions; that is the role of [Principles](PRINCIPLES.md) and Standards. They define the constraints within which all solutions must operate.
+These properties are foundational architectural commitments — Independence & Disintermediation, Resilience, Data Sovereignty, and Locality — translated into constraints on every QVAC system. They do not prescribe solutions; that is the role of [Principles](PRINCIPLES.md) and Standards. They define the constraints within which all solutions must operate.
 
 ---
 
@@ -44,7 +44,7 @@ The architecture must accommodate the full spectrum of hardware: from constraine
 
 QVAC's vision spans light bulbs, wearables, phones, laptops, home hubs, industrial servers, and environments that don't yet exist. The architecture must be a set of composable building blocks — standardized, stackable — not a monolith that only runs on high-end hardware. What varies across the spectrum is capability and performance; what remains constant is the interface contract and the other properties in this manifesto.
 
-*Derived from: North-Star "LEGO block" framing, OKR targets for IoT, robotics, and embedded hardware*
+*Derived from: composable building-block framing, target hardware spectrum from microcontrollers to servers*
 
 ## 6. Integrity of the core over speed of delivery
 
@@ -52,7 +52,7 @@ The properties in this manifesto are hard constraints, not aspirations to trade 
 
 There is a fundamental difference between deliberate speed — focused, prioritized, intentional execution — and rushed work that accumulates structural debt. QVAC is building infrastructure for decades, not shipping features for quarters. Every shortcut on the foundation becomes a constraint on everything built above it, across every product in the ecosystem.
 
-*Derived from: North-Star Product Principle #3 "deliberate speed, not rushed work"*
+*Derived from: deliberate speed over rushed work*
 
 ## 7. Built for the long now
 
@@ -60,4 +60,4 @@ QVAC is infrastructure, not an application. Architectural choices prioritize lon
 
 Model architectures will change. Hardware accelerators will evolve. Networking protocols will be replaced. The QVAC platform must outlast all of these. This means stable interface contracts (not stable implementations), strategic investment in the engine layer where it serves QVAC's unique needs, and avoiding tight coupling to external dependencies that could disappear or change direction.
 
-*Derived from: North-Star "for the next tens, hundreds, millions and billions of years", Local-First Software ideal "the Long Now"*
+*Derived from: long-horizon platform thinking, Local-First Software ideal "the Long Now"*

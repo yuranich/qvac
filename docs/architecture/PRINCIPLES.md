@@ -1,6 +1,6 @@
 # QVAC Architectural Principles
 
-These are decision-making rules for QVAC engineers. Each is traceable to the [Architectural Manifesto](MANIFESTO.md) and grounded in codebase evidence or OKR commitments. They exist to help someone choose between two reasonable design options.
+These are decision-making rules for QVAC engineers. Each is traceable to the [Architectural Manifesto](MANIFESTO.md) and grounded in codebase evidence. They exist to help someone choose between two reasonable design options.
 
 Principles are not aspirational platitudes. If a principle doesn't help resolve a real design disagreement, it doesn't belong here.
 
@@ -219,7 +219,7 @@ Principles are not aspirational platitudes. If a principle doesn't help resolve 
 
 **Implications:**
 - Binary size, memory footprint, and startup time must be tracked in CI. Regressions on constrained device profiles are blocking, not advisory.
-- Model profiles must be tiered by device capability (OKR: low/medium/high device tiers). The SDK must make it easy to select the right model for the hardware, not just the best model overall.
+- Model profiles must be tiered by device capability (low/medium/high device tiers). The SDK must make it easy to select the right model for the hardware, not just the best model overall.
 - New dependencies must justify their weight. A library that adds 5MB to the bundle needs a strong case; a 50KB alternative that covers 90% of the use case is preferred.
 - Tree-shaking via `bare-pack` is not just a nice-to-have — it is the mechanism that keeps bundles viable on constrained devices. Capabilities not used must add zero weight.
 - Inference that produces sequential output (LLM token generation, transcription segments, TTS audio frames, translation segments) must deliver results progressively. On constrained devices, unary delivery of multi-second generative inference is not viable UX — streaming is a consequence of targeting the constrained end of the spectrum, not an independent concern. Atomic outputs (embedding vectors, classifier scores, language detection) return a single result.
@@ -285,9 +285,7 @@ Principles are not aspirational platitudes. If a principle doesn't help resolve 
 Foundational documents and external works that shaped these principles.
 
 **Internal**
-- [QVAC Ecosystem North-Star](https://docs.google.com/document/d/1kmR6aiwLsFjiAl3UPxHROCgYq4XkcCEEve1H_zoR9Lc/edit?tab=t.0) — Axioms, product principles, and multi-year vision
 - [QVAC Architectural Manifesto](MANIFESTO.md) — The non-negotiable properties these principles derive from
-- [QVAC OKRs 2026](https://docs.google.com/document/d/FIXME_OKRS) — Measurable commitments referenced in trade-offs and implications
 
 **External**
 - [Local-First Software](https://www.inkandswitch.com/essay/local-first/) (Kleppmann et al., 2019) — Seven ideals for software where the device is primary. Directly relevant: QVAC is local-first AI inference. Ideals include "no spinners," "network is optional," "data ownership," and "the Long Now."
