@@ -50,11 +50,11 @@ Use this static mapping (embedded; do not depend on external files). The pod lab
 | Package(s) | Pod (Context) |
 | --- | --- |
 | `packages/sdk`, `packages/cli`, `packages/rag`, `packages/logging`, `packages/error` | `SDK` |
-| `packages/qvac-lib-infer-llamacpp-llm`, `packages/qvac-lib-infer-llamacpp-embed`, `packages/qvac-lib-infer-onnx`, `packages/diffusion-cpp`, `packages/qvac-lib-langdetect-text*` | `NLP / Media Gen` |
-| `packages/ocr-onnx`, `packages/qvac-lib-infer-nmtcpp` | `Vision / Translation` |
-| `packages/qvac-lib-infer-whispercpp`, `packages/bci-whispercpp`, `packages/qvac-lib-infer-parakeet`, `packages/qvac-lib-infer-onnx-tts`, `packages/decoder-audio`, `packages/qvac-lib-decoder-audio` | `Speech` |
-| `packages/qvac-lib-inference-addon-cpp`, `packages/qvac-lint-cpp`, `packages/qvac-lib-infer-base`, `packages/dl-base`, `packages/dl-filesystem`, `packages/dl-hyperdrive`, `packages/qvac-lib-dl-*`, `packages/qvac-lib-diagnostics` | `DevOps` (cross-cutting infra) |
-| `packages/qvac-lib-registry-server` | architect (sole maintainer) |
+| `packages/llm-llamacpp`, `packages/embed-llamacpp`, `packages/onnx`, `packages/diffusion-cpp`, `packages/langdetect-text`, `packages/langdetect-text-cld2` | `NLP / Media Gen` |
+| `packages/ocr-onnx`, `packages/translation-nmtcpp` | `Vision / Translation` |
+| `packages/transcription-whispercpp`, `packages/bci-whispercpp`, `packages/transcription-parakeet`, `packages/tts-onnx`, `packages/decoder-audio` | `Speech` |
+| `packages/inference-addon-cpp`, `packages/lint-cpp`, `packages/infer-base`, `packages/diagnostics`, `packages/dl-base`, `packages/dl-filesystem`, `packages/dl-hyperdrive`, `packages/qvac-lib-dl-base`, `packages/qvac-lib-dl-filesystem`, `packages/qvac-lib-dl-hyperdrive` | `DevOps` (cross-cutting infra) |
+| `packages/registry-server`, `packages/qvac-lib-registry-server` | architect (sole maintainer) |
 
 If a package is not in the table, fall back to `git log -n 20 --format='%aN' -- packages/<name>` to identify recent contributors and ask the user which pod owns it. Do not guess silently.
 
