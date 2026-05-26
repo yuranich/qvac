@@ -1,11 +1,11 @@
 ---
 name: qv-skill-list
-description: Catalog of all repo qv-* custom skills with one-line purpose and when-to-use. Use when the user asks what skills exist, which skill to use, how to invoke a skill, or invokes /qv-skill-list.
+description: Catalog of repo custom skills with one-line purpose and when-to-use. Use when the user asks what skills exist, which skill to use, how to invoke a skill, or invokes /qv-skill-list.
 ---
 
 # QVAC Custom Skills Catalog
 
-All custom repo skills live under `.cursor/skills/` and use the `qv-` prefix. Invoke with `/qv-<name>` in chat.
+Custom repo skills live under `.cursor/skills/`. Invoke them by name in chat.
 
 **Not listed here (by design):**
 
@@ -17,9 +17,9 @@ All custom repo skills live under `.cursor/skills/` and use the `qv-` prefix. In
 | Mode | Behavior |
 |------|----------|
 | **Auto-invokable** | No `disable-model-invocation` in frontmatter — the agent may load the skill when your request matches the description. |
-| **Manual only** | `disable-model-invocation: true` — invoke explicitly with `/qv-<name>` (or ask the agent to run that skill). |
+| **Manual only** | `disable-model-invocation: true` — invoke explicitly with `/<skill-name>` (or ask the agent to run that skill). |
 
-When unsure which skill fits, scan the tables below or ask: *"which qv skill should I use for …?"*
+When unsure which skill fits, scan the tables below or ask: *"which custom skill should I use for …?"*
 
 ---
 
@@ -96,6 +96,8 @@ When unsure which skill fits, scan the tables below or ask: *"which qv skill sho
 ---
 
 ## Architecture proposals (QIP)
+
+Naming note: QIP skills intentionally use `qip-*` instead of `qv-*` because they are architect-owned proposal helpers, not pod-specific workflow skills.
 
 | Skill | Purpose | Use when |
 |-------|---------|----------|

@@ -27,7 +27,6 @@ Read before drafting:
 
 - [references/qip-template.md](references/qip-template.md)
 - `docs/architecture/PRINCIPLES.md` for lightweight principle checks
-- `arch/ADVICE-PROCESS.md` advice principle: consult everyone meaningfully affected and people with relevant expertise
 
 ## Entry modes
 
@@ -55,6 +54,8 @@ Do not dump all questions at once unless the user asks for a batch.
 ## Consultation note
 
 Before the final draft, produce a short `People to consult before posting` note.
+
+Use this advice rule: consult everyone meaningfully affected and people with relevant expertise.
 
 Include:
 
