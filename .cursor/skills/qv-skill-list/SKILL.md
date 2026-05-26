@@ -1,11 +1,11 @@
 ---
 name: qv-skill-list
-description: Catalog of repo custom skills with one-line purpose and when-to-use. Use when the user asks what skills exist, which skill to use, how to invoke a skill, or invokes /qv-skill-list.
+description: Catalog of all repo qv-* custom skills with one-line purpose and when-to-use. Use when the user asks what skills exist, which skill to use, how to invoke a skill, or invokes /qv-skill-list.
 ---
 
 # QVAC Custom Skills Catalog
 
-Custom repo skills live under `.cursor/skills/`. Invoke them by name in chat.
+All custom repo skills live under `.cursor/skills/` and use the `qv-` prefix. Invoke with `/qv-<name>` in chat.
 
 **Not listed here (by design):**
 
@@ -17,9 +17,9 @@ Custom repo skills live under `.cursor/skills/`. Invoke them by name in chat.
 | Mode | Behavior |
 |------|----------|
 | **Auto-invokable** | No `disable-model-invocation` in frontmatter — the agent may load the skill when your request matches the description. |
-| **Manual only** | `disable-model-invocation: true` — invoke explicitly with `/<skill-name>` (or ask the agent to run that skill). |
+| **Manual only** | `disable-model-invocation: true` — invoke explicitly with `/qv-<name>` (or ask the agent to run that skill). |
 
-When unsure which skill fits, scan the tables below or ask: *"which custom skill should I use for …?"*
+When unsure which skill fits, scan the tables below or ask: *"which qv skill should I use for …?"*
 
 ---
 
@@ -97,13 +97,11 @@ When unsure which skill fits, scan the tables below or ask: *"which custom skill
 
 ## Architecture proposals (QIP)
 
-Naming note: QIP skills intentionally use `qip-*` instead of `qv-*` because they are architect-owned proposal helpers, not pod-specific workflow skills.
-
 | Skill | Purpose | Use when |
 |-------|---------|----------|
-| [`qip-significance-check`](../qip-significance-check/SKILL.md) | Conservatively checks whether a change clearly needs a QIP before deeper implementation. | Planning or implementing contract, cross-package, delivery, or principle-impacting work; PR review. **Auto** |
-| [`qip-proposal-create`](../qip-proposal-create/SKILL.md) | Drafts a Slack Canvas-ready QIP from a clear proposal or fuzzy idea. | Creating a QIP, shaping alternatives and consequences, naming people to consult. **Auto** |
-| [`qip-proposal-review`](../qip-proposal-review/SKILL.md) | Reviews a QIP for approval readiness, risks, principle conflicts, and consultation coverage. | Reviewing a QIP draft before posting or approval. **Auto** |
+| [`qv-arch-qip-significance-check`](../qv-arch-qip-significance-check/SKILL.md) | Conservatively checks whether a change clearly needs a QIP before deeper implementation. | Planning or implementing contract, cross-package, delivery, or principle-impacting work; PR review. **Auto** |
+| [`qv-arch-qip-proposal-create`](../qv-arch-qip-proposal-create/SKILL.md) | Drafts a Slack Canvas-ready QIP from a clear proposal or fuzzy idea. | Creating a QIP, shaping alternatives and consequences, naming people to consult. **Auto** |
+| [`qv-arch-qip-proposal-review`](../qv-arch-qip-proposal-review/SKILL.md) | Reviews a QIP for approval readiness, risks, principle conflicts, and consultation coverage. | Reviewing a QIP draft before posting or approval. **Auto** |
 
 Rule nudge: `.cursor/rules/qip-significance.mdc`
 
@@ -129,7 +127,7 @@ Rule nudge: `.cursor/rules/qip-significance.mdc`
 | Registry Autobase/HyperDB help | `qv-registry-autobase-patterns` |
 | Holepunch stack help | `qv-holepunch-dev` |
 | Generate NOTICE files | `qv-notice-generate` |
-| Check if a QIP is needed | `qip-significance-check` |
-| Draft a QIP | `qip-proposal-create` |
-| Review a QIP | `qip-proposal-review` |
+| Check if a QIP is needed | `qv-arch-qip-significance-check` |
+| Draft a QIP | `qv-arch-qip-proposal-create` |
+| Review a QIP | `qv-arch-qip-proposal-review` |
 | List all skills | `qv-skill-list` (this file) |

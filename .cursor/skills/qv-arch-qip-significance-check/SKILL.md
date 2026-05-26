@@ -1,6 +1,6 @@
 ---
-name: qip-significance-check
-description: Conservatively checks whether a planned change, implementation, or PR review touches architectural significance triggers such as public SDK API, native dependency, plugin contract, model registry contract, runtime, transport, storage, release flow, npm publishing, deployment schema, security enforcement, NFR, or architecture principles. Recommends drafting a QIP before going deeper when impact is clear. Use during planning, implementation, PR review, or when invoking /qip-significance-check.
+name: qv-arch-qip-significance-check
+description: Conservatively checks whether a planned change, implementation, or PR review touches architectural significance triggers such as public SDK API, native dependency, plugin contract, model registry contract, runtime, transport, storage, release flow, npm publishing, deployment schema, security enforcement, NFR, or architecture principles. Recommends drafting a QIP before going deeper when impact is clear. Use during planning, implementation, PR review, or when invoking /qv-arch-qip-significance-check.
 ---
 
 # QIP Significance Check
@@ -14,12 +14,12 @@ Conservatively decide whether a change needs a QIP before deeper implementation 
 - Planning or implementing a change that may affect architecture
 - Reviewing a PR or diff for cross-package, contract, delivery, or principle impact
 - Another workflow asks whether a proposal is needed first
-- User invokes `/qip-significance-check`
+- User invokes `/qv-arch-qip-significance-check`
 
 **Do NOT use for:**
 
-- Drafting the QIP itself (use `qip-proposal-create`)
-- Reviewing an existing QIP draft (use `qip-proposal-review`)
+- Drafting the QIP itself (use `qv-arch-qip-proposal-create`)
+- Reviewing an existing QIP draft (use `qv-arch-qip-proposal-review`)
 
 ## Core stance
 
@@ -36,7 +36,7 @@ Conservatively decide whether a change needs a QIP before deeper implementation 
 5. If a trigger clearly fires:
    - Name the trigger and why in one or two sentences
    - Recommend drafting a QIP before going deeper
-   - Ask whether to hand off to `qip-proposal-create`
+   - Ask whether to hand off to `qv-arch-qip-proposal-create`
    - Do not start drafting unless the user confirms
 
 ## Output format
