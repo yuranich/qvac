@@ -95,6 +95,18 @@ When unsure which skill fits, scan the tables below or ask: *"which qv skill sho
 
 ---
 
+## Architecture proposals (QIP)
+
+| Skill | Purpose | Use when |
+|-------|---------|----------|
+| [`qip-significance-check`](../qip-significance-check/SKILL.md) | Conservatively checks whether a change clearly needs a QIP before deeper implementation. | Planning or implementing contract, cross-package, delivery, or principle-impacting work; PR review. **Auto** |
+| [`qip-proposal-create`](../qip-proposal-create/SKILL.md) | Drafts a Slack Canvas-ready QIP from a clear proposal or fuzzy idea. | Creating a QIP, shaping alternatives and consequences, naming people to consult. **Auto** |
+| [`qip-proposal-review`](../qip-proposal-review/SKILL.md) | Reviews a QIP for approval readiness, risks, principle conflicts, and consultation coverage. | Reviewing a QIP draft before posting or approval. **Auto** |
+
+Rule nudge: `.cursor/rules/qip-significance.mdc`
+
+---
+
 ## Quick picker
 
 | You want to… | Skill |
@@ -115,4 +127,7 @@ When unsure which skill fits, scan the tables below or ask: *"which qv skill sho
 | Registry Autobase/HyperDB help | `qv-registry-autobase-patterns` |
 | Holepunch stack help | `qv-holepunch-dev` |
 | Generate NOTICE files | `qv-notice-generate` |
+| Check if a QIP is needed | `qip-significance-check` |
+| Draft a QIP | `qip-proposal-create` |
+| Review a QIP | `qip-proposal-review` |
 | List all skills | `qv-skill-list` (this file) |
