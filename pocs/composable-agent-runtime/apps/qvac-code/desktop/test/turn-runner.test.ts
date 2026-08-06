@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { createJournalSeqAllocator } from '@qvac-poc/qvac-code-shared'
 import type { AssistantFacade } from '@qvac/assistant'
 import type { HarnessEvent } from '@qvac/harness'
 import type { CodeMeshStore } from '@qvac-poc/qvac-code-shared/store'
@@ -98,6 +99,7 @@ function baseInput(overrides: Partial<TurnRunnerInput> = {}): TurnRunnerInput {
     prompt: 'do the thing',
     agentId: 'code/session-1',
     signal: new AbortController().signal,
+    entrySeq: createJournalSeqAllocator(0),
     ...overrides
   }
 }
@@ -210,6 +212,25 @@ describe('createTurnRunner', function () {
 
     expect(result.status).toBe('cancelled')
     expect(recordOutcomeCalls[0]?.status).toBe('cancelled')
+  })
+
+  test('an aborted event after an error keeps the failed status', async function () {
+    const { store, recordOutcomeCalls } = createFakeStore()
+    const { assistant } = createFakeAssistant({
+      events: [
+        { type: 'error', message: 'boom' },
+        { type: 'aborted' }
+      ]
+    })
+    const runner = createTurnRunner({ store, assistant, executorId: EXECUTOR_ID, now: () => 0 })
+
+    const result = await runner.run(baseInput())
+
+    // A reported failure outranks a same-moment abort: the turn genuinely
+    // failed, and recording it as 'cancelled' would hide the error from every
+    // surface that reads the work row's outcome.
+    expect(result.status).toBe('failed')
+    expect(recordOutcomeCalls[0]?.status).toBe('failed')
   })
 
   test('a superseded outcome appends turn-superseded and resolves without throwing', async function () {

@@ -1,5 +1,8 @@
 import type { AssistantFacade } from '@qvac/assistant'
 import {
+  createJournalSeqAllocator,
+  resumeJournalSeq,
+  type JournalSeqAllocator,
   CODE_EXECUTOR_CAPABILITY,
   decideClaimAction,
   decodeTurnPayload,
@@ -46,6 +49,14 @@ export interface ExecutorDeps {
   readonly turnRunner: ReturnType<typeof createTurnRunner>
   readonly approvals: ReturnType<typeof createApprovalBridge>
   readonly now: () => number
+  /**
+   * Must resolve early when the signal passed to `run()` aborts, not run the
+   * full duration. Shutdown promptness depends on it: both loops below only
+   * re-check `signal.aborted` after their sleep resolves, so a sleep that
+   * ignores the abort would delay exit by up to PRESENCE_INTERVAL_MS (30s).
+   * The composition root satisfies this by binding the run signal into it
+   * (see index.ts's `sleep(ms, signal)`); the signature cannot express it.
+   */
   readonly sleep: (ms: number) => Promise<void>
   readonly onEvent?: (event: ExecutorEvent) => void
   readonly allowSecondExecutor: boolean
@@ -77,25 +88,29 @@ export function createExecutor(deps: ExecutorDeps): {
 } {
   const claimedInThisProcess = new Set<string>()
   const registeredAgents = new Set<string>()
-  // executor.ts, turn-runner.ts, and approval-bridge.ts all append journal
-  // entries as the same writer (this executor) for a turn's journal, and
-  // Sync's operationId for an entry is keyed on (turnWorkId, writer, seq) --
-  // see the fuller explanation in approval-bridge.ts. turn-runner.ts's
-  // per-run counter is safe to reset to 0 on every run() call because a turn
-  // is never re-executed once claimed (see recordInterrupted below), so its
-  // entries for a given turnWorkId only ever come from one process
-  // lifetime. executor.ts's own bookkeeping entries (turn-claim,
-  // turn-superseded, turn-interrupted) do not have that guarantee: this
-  // executor's identity is stable across restarts by design (see
-  // executor-identity.ts), so a turn-claim this process writes today and a
-  // turn-interrupted a *later, restarted* process writes for the same turn
-  // share a writer id but come from different process lifetimes. A counter
-  // that resets on each call would collide across that restart the same way
-  // a per-run reset would; real wall-clock time -- which always advances
-  // across a restart -- disambiguates it for free. The nonce only guards the
-  // (rare, same-process) case of two entries landing in the same clock
-  // tick.
-  let executorEntryNonce = 0
+  // executor.ts, turn-runner.ts and approval-bridge.ts all append to a turn's
+  // journal as the same writer (this executor), and `seq` is both the
+  // operationId discriminator and the transcript's render order. One allocator
+  // per turn, shared by all three, is therefore the only scheme that keeps
+  // appends distinct *and* the transcript in the order things happened.
+  //
+  // It is seeded from the journal rather than from zero because this executor's
+  // identity is stable across restarts by design (see executor-identity.ts): a
+  // turn-claim written by this process and a turn-interrupted written by a
+  // later, restarted one share a writer id, and resuming past the highest
+  // existing seq is what keeps their operationIds distinct.
+  const seqAllocators = new Map<string, JournalSeqAllocator>()
+
+  async function allocatorFor(turnWorkId: string) {
+    const existing = seqAllocators.get(turnWorkId)
+    if (existing) return existing
+    const entries = await deps.store.listJournal(turnWorkId)
+    const allocator = createJournalSeqAllocator(
+      resumeJournalSeq(entries, deps.identity.executorId)
+    )
+    seqAllocators.set(turnWorkId, allocator)
+    return allocator
+  }
 
   async function preflight() {
     const executors = await deps.store.listExecutors()
@@ -152,10 +167,12 @@ export function createExecutor(deps: ExecutorDeps): {
   async function run(signal: AbortSignal) {
     const presence = presenceLoop(signal)
     try {
-      // Sleep here has no signal of its own (see ExecutorDeps.sleep), so a
-      // pass already in flight and the interval between passes both run to
-      // completion before this loop notices an abort -- bounded by
-      // DEFAULT_LOOP_INTERVAL_MS, an acceptable shutdown latency for a PoC.
+      // Exit is prompt on abort, but only because every waiting point
+      // observes the signal: deps.sleep resolves early (its contract above),
+      // the per-turn loop in runOnePass returns on its next iteration, and an
+      // in-flight executeTurn aborts through the controller it forwards the
+      // signal into. Nothing here waits out DEFAULT_LOOP_INTERVAL_MS or
+      // PRESENCE_INTERVAL_MS after a shutdown request.
       while (!signal.aborted) {
         await runOnePass(signal)
         if (signal.aborted) return
@@ -317,11 +334,13 @@ export function createExecutor(deps: ExecutorDeps): {
     await ensureAgentRegistered(agentId)
 
     const payload = decodeTurnPayload(work.payload)
+    const entrySeq = await allocatorFor(work.workId)
     const track = deps.approvals.track({
       turnWorkId: work.workId,
       sessionId: parsed.sessionId,
       seq: parsed.seq,
-      runId: work.workId
+      runId: work.workId,
+      entrySeq
     })
 
     const controller = new AbortController()
@@ -338,7 +357,8 @@ export function createExecutor(deps: ExecutorDeps): {
         turnWorkId: work.workId,
         prompt: payload.prompt,
         agentId,
-        signal: controller.signal
+        signal: controller.signal,
+        entrySeq
       })
       deps.onEvent?.({ kind: 'finished', turnWorkId: work.workId, detail: result.status })
     } finally {
@@ -399,12 +419,13 @@ export function createExecutor(deps: ExecutorDeps): {
     }
   }
 
-  function appendExecutorEntry(
+  async function appendExecutorEntry(
     workId: string,
     parsed: TurnRef,
     body: JournalEntryBody
   ) {
-    const seq = deps.now() + executorEntryNonce++
+    const allocator = await allocatorFor(workId)
+    const seq = allocator.next()
     return deps.store
       .appendEntry({
         sessionId: parsed.sessionId,

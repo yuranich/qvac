@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import type { AssistantFacade } from '@qvac/assistant'
 import type { HarnessApprovalDecision, HarnessApprovalRequest } from '@qvac/harness'
 import {
+  createJournalSeqAllocator,
   formatApprovalDecision,
   parseApprovalDecision,
   type CodeApprovalDecision
@@ -250,7 +251,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntil(() => appended.length > 0 && openedGates.length > 0)
@@ -294,7 +301,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntil(() => approvals.resolveCalls.length > 0)
@@ -329,7 +342,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntil(() => resolved.length > 0)
@@ -356,7 +375,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntil(() => approvals.resolveCalls.length > 0)
@@ -379,7 +404,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntil(() => approvals.resolveCalls.length > 0)
@@ -407,7 +438,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntilGateOpen(store, turnWorkId)
@@ -461,7 +498,13 @@ describe('createApprovalBridge', function () {
     })
 
     const turnWorkId = turnWorkIdFor('session-1', 0)
-    const track = bridge.track({ turnWorkId, sessionId: 'session-1', seq: 0, runId: turnWorkId })
+    const track = bridge.track({
+      turnWorkId,
+      sessionId: 'session-1',
+      seq: 0,
+      runId: turnWorkId,
+      entrySeq: createJournalSeqAllocator(0)
+    })
     void bridge.start(new AbortController().signal)
     approvals.push(request({ runId: turnWorkId }))
     await waitUntilGateOpen(store, turnWorkId)

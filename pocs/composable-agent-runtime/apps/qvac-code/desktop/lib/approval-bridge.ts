@@ -1,6 +1,7 @@
 import type { AssistantFacade } from '@qvac/assistant'
 import type { HarnessApprovalRequest } from '@qvac/harness'
 import {
+  type JournalSeqAllocator,
   formatApprovalGateId,
   isClaimGateId,
   parseApprovalDecision,
@@ -13,8 +14,18 @@ import type { CodeMeshStore } from '@qvac-poc/qvac-code-shared/store'
 /** How often the mesh arm of the race re-reads the gate while nothing has
  * decided it yet. A `watch` would wake faster, but `store.watchOpenGates` is
  * mesh-wide (every open gate, on every mesh change) where this needs one
- * specific gate on one specific turn -- polling a bounded, cheap read is
- * simpler than filtering a firehose down to one id on every wake. */
+ * specific gate on one specific turn, so polling is simpler than filtering a
+ * firehose down to one id on every wake.
+ *
+ * Simpler, but not cheap: `listGates` is not a point read. The durable-work
+ * reducer answers `list-gates` by scanning the whole GATES table and
+ * filtering by workId afterwards
+ * (packages/sync/lib/profiles/durable-work/reducer.ts:81-89), so each poll
+ * costs a full scan of every gate ever opened across the mesh, and N
+ * concurrently pending approvals poll N times over the same table. Both arms
+ * of the tradeoff are therefore mesh-wide reads; polling wins on simplicity
+ * alone. Collapsing all pending approvals onto one shared `listOpenGates`
+ * tick is the fix if this ever leaves PoC scale. */
 const APPROVAL_POLL_INTERVAL_MS = 400
 
 // approval-bridge.ts and turn-runner.ts both append journal entries as the
@@ -23,13 +34,6 @@ const APPROVAL_POLL_INTERVAL_MS = 400
 // draining, while this module races the decision in parallel. Sync's
 // operationId for an entry is keyed on (turnWorkId, writer, seq), so if both
 // modules started their own seq counter at 0 independently, their entries
-// could collide and one would be silently dropped by dedup. Reserving a
-// disjoint, far larger numeric band here (turn-runner.ts's counter is a
-// per-turn count of streamed events, realistically in the tens to low
-// hundreds) keeps the two writers' entries from ever colliding without
-// needing a counter shared between the two modules.
-const APPROVAL_ENTRY_SEQ_BASE = 1_000_000_000
-
 const DETAIL_VALUE_MAX_LENGTH = 200
 const SUMMARY_MAX_LENGTH = 120
 const MAX_DETAIL_LINES = 8
@@ -63,7 +67,7 @@ interface TrackedTurn {
   readonly seq: number
   readonly runId: string
   gateIndex: number
-  entrySeq: number
+  readonly entrySeq: JournalSeqAllocator
   readonly openGates: Map<string, AbortController>
 }
 
@@ -78,6 +82,7 @@ export function createApprovalBridge(deps: ApprovalBridgeDeps): {
     readonly sessionId: string
     readonly seq: number
     readonly runId: string
+    readonly entrySeq: JournalSeqAllocator
   }): { release(): void }
   start(signal: AbortSignal): Promise<void>
   closeTurn(turnWorkId: string): Promise<void>
@@ -91,6 +96,7 @@ export function createApprovalBridge(deps: ApprovalBridgeDeps): {
     readonly sessionId: string
     readonly seq: number
     readonly runId: string
+    readonly entrySeq: JournalSeqAllocator
   }) {
     const tracked: TrackedTurn = {
       turnWorkId: input.turnWorkId,
@@ -98,7 +104,7 @@ export function createApprovalBridge(deps: ApprovalBridgeDeps): {
       seq: input.seq,
       runId: input.runId,
       gateIndex: 0,
-      entrySeq: APPROVAL_ENTRY_SEQ_BASE,
+      entrySeq: input.entrySeq,
       openGates: new Map()
     }
     byRunId.set(input.runId, tracked)
@@ -331,7 +337,7 @@ export function createApprovalBridge(deps: ApprovalBridgeDeps): {
       | { readonly type: 'approval-requested'; readonly gateId: string; readonly name: string; readonly summary: string; readonly detail: readonly string[] }
       | { readonly type: 'approval-resolved'; readonly gateId: string; readonly decision: CodeApprovalDecision; readonly reason: string | null }
   ) {
-    const seq = tracked.entrySeq++
+    const seq = tracked.entrySeq.next()
     try {
       await deps.store.appendEntry({
         sessionId: tracked.sessionId,

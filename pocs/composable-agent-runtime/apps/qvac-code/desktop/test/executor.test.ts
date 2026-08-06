@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { AssistantFacade } from '@qvac/assistant'
 import type { HarnessAgentRegistration } from '@qvac/harness'
 import {
+  encodeJournalBody,
   CODE_CLAIM_GATE_ID,
   CODE_EXECUTOR_CAPABILITY,
   CODE_SESSION_FORMAT,
@@ -16,6 +17,7 @@ import {
   type CodeTurnPayload
 } from '@qvac-poc/qvac-code-shared'
 import type {
+  CodeJournalEntryRecord,
   CodeExecutorRecord,
   CodeGateRecord,
   CodeMeshStore,
@@ -33,10 +35,6 @@ const IDENTITY: ExecutorIdentity = {
   projectLabel: 'project'
 }
 
-// executor.ts writes its own bookkeeping entries with `seq = now() + nonce`
-// (see the comment in executor.ts). A constant now() is fine for these
-// tests: the fake store never rejects on a repeated seq the way a real
-// operationId-deduping Sync store would.
 function notImplemented(name: string) {
   return () => {
     throw new Error(`${name} is not implemented in this fake`)
@@ -168,7 +166,20 @@ function createFakeStore(
         (work) => work.payloadFormat === CODE_TURN_FORMAT && !work.cancelRequested && work.outcomeStatus == null
       )
     },
-    listJournal: notImplemented('listJournal'),
+    // Read for real: the executor seeds each turn's shared seq allocator from
+    // the journal, so that a restarted process resumes past its own earlier
+    // entries instead of colliding with them.
+    async listJournal(turnWorkId) {
+      return appended
+        .filter((entry) => formatTurnWorkId(entry) === turnWorkId)
+        .map((entry, index) => ({
+          id: `entry-${index}`,
+          workId: turnWorkId,
+          entryType: entry.body.type,
+          body: encodeJournalBody(entry.body),
+          recordedAt: index
+        })) as unknown as CodeJournalEntryRecord[]
+    },
     async listGates(workId) {
       if (throwOnListGates?.has(workId)) throw new Error(`listGates failed for ${workId}`)
       return gateList(workId) as unknown as CodeGateRecord[]

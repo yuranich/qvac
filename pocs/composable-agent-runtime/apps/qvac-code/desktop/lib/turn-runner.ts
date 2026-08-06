@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import type { AssistantFacade } from '@qvac/assistant'
 import type { HarnessEvent, HarnessJsonValue } from '@qvac/harness'
 import {
+  type JournalSeqAllocator,
   CODE_TRUNCATION_MESSAGE,
   createDeltaBatcher,
   type CodeJournalBody,
@@ -55,6 +56,14 @@ export interface TurnRunnerInput {
   readonly prompt: string
   readonly agentId: string
   readonly signal: AbortSignal
+  /**
+   * Shared with every other module that appends to this turn as this executor.
+   * `seq` is both the operationId discriminator and the transcript's render
+   * order, so a private counter here would either collide with the approval
+   * bridge's entries or, if given a disjoint band to avoid that, silently
+   * relocate them in the rendered transcript.
+   */
+  readonly entrySeq: JournalSeqAllocator
 }
 
 export function createTurnRunner(deps: TurnRunnerDeps): {
@@ -62,15 +71,6 @@ export function createTurnRunner(deps: TurnRunnerDeps): {
 } {
   return {
     async run(input) {
-      // Per-turn and local to this call: a fresh run() is a fresh writer
-      // stream, and reusing a counter across turns (or sharing it with
-      // anything else that also writes as this executor for this same turn,
-      // e.g. approval-bridge.ts) would let two different entries collide on
-      // the same (turnWorkId, writer, seq) operationId -- Sync's dedup would
-      // then silently drop the second one. approval-bridge.ts reserves a
-      // disjoint, much larger numeric band for its own entries on the same
-      // turn for exactly this reason; see the comment there.
-      let entrySeq = 0
       let toolCallSequence = 0
       const pendingCallRefs = new Map<string, string[]>()
       const contentBatcher = createDeltaBatcher()
@@ -79,7 +79,7 @@ export function createTurnRunner(deps: TurnRunnerDeps): {
       let status: TurnRunResult['status'] = 'completed'
 
       async function appendJournalEntry(body: JournalEntryBody) {
-        const seq = entrySeq++
+        const seq = input.entrySeq.next()
         try {
           await deps.store.appendEntry({
             sessionId: input.sessionId,
@@ -236,7 +236,11 @@ export function createTurnRunner(deps: TurnRunnerDeps): {
           return
         }
         // event.type === 'aborted'
-        status = 'cancelled'
+        // Same precedence rule the post-loop fallback applies: a reported
+        // failure is more informative than a same-moment abort, so an
+        // 'aborted' arriving after an 'error' must not downgrade the turn's
+        // recorded outcome from 'failed' to 'cancelled'.
+        if (status !== 'failed') status = 'cancelled'
       }
     }
   }
