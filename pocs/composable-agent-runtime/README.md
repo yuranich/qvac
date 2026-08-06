@@ -49,6 +49,68 @@ Run package, graph, clean-consumer, and type verification with:
 bun run verify
 ```
 
+## Configure the stack from one file
+
+An application writes one QVAC config file, `qvac.assistant.yaml`, next to its
+`app.json`. `@qvac/assistant/expo-plugin` resolves it during prebuild and
+propagates it to the packages it composes, so the build produces only what the
+app declares:
+
+```yaml
+version: 1
+
+logging:
+  level: info
+
+inference:
+  capabilities:
+    - llm
+  accelerators:
+    - cpu
+```
+
+Capability names come from the installed `@qvac/sdk`, not from a list Assistant
+maintains: either a canonical model type (`llamacpp-completion`, `ggml-ocr`, …)
+or one of SDK's own aliases (`llm`, `ocr`, `diffusion`, …), both derived at
+build time from `SDK_DEFAULT_PLUGINS` and `MODEL_TYPES`. A plugin a future SDK
+adds is selectable with no change to Assistant. A third-party plugin is named
+by its specifier, as in `my-plugin/plugin`. Omit the `inference` section — or
+the file — to keep every built-in capability.
+
+`accelerators` names the GPU backends to ship: `vulkan`, `opencl`, `metal`.
+Each addon publishes one prebuilt library per backend and ggml picks among them
+at runtime from device capability, so this is a product choice, not an
+optimisation — `[cpu]` means the app runs on the CPU even where a Vulkan driver
+exists. ggml's CPU backend is always linked. Omit the list to keep every
+backend. Pruning applies to Android only; Apple platforms ship signed
+frameworks that are not pruned.
+
+Assistant generates a `qvac.config.json` from it for the SDK Expo plugin, which
+takes no props and reads only that file. The generated file is gitignored, and
+Assistant refuses to overwrite a `qvac.config.json` it did not write. What a
+build selected is recorded in `qvac/assistant-stack.manifest.json` under
+`sdkPluginSelection`. See
+[ADR 0005](docs/arch/adrs/0005-application-owned-assistant-config.md).
+
+Measured on `apps/task-mobile`, arm64-v8a release, with `bun run report:apk`:
+
+| | No config | `capabilities: [completion]` | `+ accelerators: [cpu]` |
+|---|---|---|---|
+| APK | 461.0 MB | 243.4 MB | 138.6 MB |
+| Native libraries | 424.8 MB / 72 files | 210.3 MB / 50 files | 105.5 MB / 48 files |
+| Linked addons | 39 | 28 | 28 |
+| ggml backends | vulkan, opencl, cpu | vulkan, opencl, cpu | cpu |
+
+The largest remaining file is `libbare-kit.so` at 61.9 MB — the Bare host
+runtime, 45% of the final APK, which no configuration here affects. The seven
+CPU microarchitecture variants (9.6 MB) are kept deliberately: ggml dispatches
+among them by CPU feature detection, so pinning one would exclude devices.
+
+```sh
+bun run report:apk
+bun run report:apk --project-root apps/task-mobile --apk path/to/app.apk --json /tmp/apk.json
+```
+
 ## Run the mobile clean consumer
 
 `apps/task-mobile` configures only `@qvac/assistant/expo-plugin`. It owns
