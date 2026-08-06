@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const VERSION = '0.0.0-poc'
@@ -33,6 +33,9 @@ const APP_ALLOWED = new Map<string, readonly string[]>([
       '@qvac/agents',
       '@qvac/assistant',
       '@qvac/harness',
+      // Test-only; see APP_TEST_ONLY. Production code here reaches replicated
+      // state through Assistant, which is the point of the facade.
+      '@qvac/sync',
       '@qvac-poc/qvac-code-shared'
     ]
   ],
@@ -40,6 +43,14 @@ const APP_ALLOWED = new Map<string, readonly string[]>([
   // reaching @qvac/harness or @qvac/assistant from here would retract the
   // standalone-Sync claim this app exists to prove.
   ['@qvac-poc/qvac-code-mobile', ['@qvac/sync', '@qvac-poc/qvac-code-shared']]
+])
+/**
+ * Dependencies an app may declare but must not import from shipped source. The
+ * claim-chaos integration test pairs two independent Sync meshes to exercise the
+ * arbitration the executor depends on, which no Assistant call can set up.
+ */
+const APP_TEST_ONLY = new Map<string, readonly string[]>([
+  ['@qvac-poc/qvac-code-desktop', ['@qvac/sync']]
 ])
 const INTERNAL_NAMES = new Set([
   ...PRODUCT_PACKAGES,
@@ -66,6 +77,7 @@ interface Manifest {
   version: string
   private: boolean
   dependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
 }
 
 describe('package subsets', function () {
@@ -115,14 +127,33 @@ describe('package subsets', function () {
     for (const [directoryName, manifest] of manifests) {
       expect(manifest.private).toBe(true)
       expect(manifest.version).toBe(VERSION)
-      const declared = manifest.dependencies ?? {}
       const allowed = APP_ALLOWED.get(manifest.name) ?? []
       const files = await collectTypeScriptFiles(join(ROOT, 'apps', directoryName))
       for (const file of files) {
         const source = await readFile(file, 'utf8')
         for (const dependency of internalImports(source)) {
-          expect(declared[dependency]).toBe(VERSION)
+          expect(declaredVersion(manifest, dependency)).toBe(VERSION)
           expect(allowed).toContain(dependency)
+        }
+      }
+    }
+  })
+
+  /**
+   * Some app dependencies exist only so an integration test can build a topology
+   * no facade call can produce -- two independent meshes, say. Allowing those in
+   * the app's dependency list without this check would silently permit its
+   * production code to bypass the facade it is meant to compose through.
+   */
+  test('test-only app dependencies stay out of shipped source', async function () {
+    for (const [name, dependencies] of APP_TEST_ONLY) {
+      const directoryName = appDirectoryFor(name)
+      const files = await collectTypeScriptFiles(join(ROOT, 'apps', directoryName))
+      for (const file of files) {
+        if (isTestFile(file)) continue
+        const source = await readFile(file, 'utf8')
+        for (const dependency of internalImports(source)) {
+          expect(dependencies).not.toContain(dependency)
         }
       }
     }
@@ -239,4 +270,33 @@ function findCycle(graph: ReadonlyMap<string, readonly string[]>) {
     if (cycle) return cycle
   }
   return null
+}
+
+function appDirectoryFor(name: string) {
+  const directory = APP_DIRECTORIES.find(
+    (candidate) => `@qvac-poc/${candidate.split('/').join('-')}` === name
+  )
+  if (!directory) throw new Error(`No app directory registered for ${name}`)
+  return directory
+}
+
+function isTestFile(file: string) {
+  return (
+    file.includes(`${sep}test${sep}`) ||
+    file.includes(`${sep}integration${sep}`) ||
+    file.endsWith('.test.ts')
+  )
+}
+
+/**
+ * A test-only dependency belongs in devDependencies, so accept it from there for
+ * exactly the apps that declare it test-only. Every other dependency must be a
+ * real runtime dependency.
+ */
+function declaredVersion(manifest: Manifest, dependency: string) {
+  const runtime = manifest.dependencies?.[dependency]
+  if (runtime !== undefined) return runtime
+  const testOnly = APP_TEST_ONLY.get(manifest.name) ?? []
+  if (!testOnly.includes(dependency)) return undefined
+  return manifest.devDependencies?.[dependency]
 }

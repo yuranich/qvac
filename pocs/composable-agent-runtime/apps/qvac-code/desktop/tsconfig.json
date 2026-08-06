@@ -13,6 +13,7 @@
     "lib/**/*.ts",
     "scripts/**/*.ts",
     "test/**/*.ts",
+    "integration/**/*.ts",
     "../../../packages/sync/vendor.d.ts",
     "../../../packages/sync/spec/**/*.d.ts"
   ]
