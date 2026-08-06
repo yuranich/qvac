@@ -1,0 +1,1 @@
+export const QVAC_CODE_DESKTOP_PLACEHOLDER = true

@@ -16,13 +16,30 @@ const APP_DIRECTORIES = [
   'skill-cli',
   'task-cli',
   'task-mobile',
-  'task-shared'
+  'task-shared',
+  'qvac-code/shared',
+  'qvac-code/desktop',
+  'qvac-code/mobile'
 ] as const
 const APP_ALLOWED = new Map<string, readonly string[]>([
   ['@qvac-poc/skill-cli', ['@qvac/agents', '@qvac/harness']],
   ['@qvac-poc/task-cli', ['@qvac/assistant', '@qvac-poc/task-shared']],
   ['@qvac-poc/task-mobile', ['@qvac/assistant', '@qvac-poc/task-shared']],
-  ['@qvac-poc/task-shared', ['@qvac/sync']]
+  ['@qvac-poc/task-shared', ['@qvac/sync']],
+  ['@qvac-poc/qvac-code-shared', ['@qvac/sync']],
+  [
+    '@qvac-poc/qvac-code-desktop',
+    [
+      '@qvac/agents',
+      '@qvac/assistant',
+      '@qvac/harness',
+      '@qvac-poc/qvac-code-shared'
+    ]
+  ],
+  // Sync only. The thin client runs no inference and executes no tools, so
+  // reaching @qvac/harness or @qvac/assistant from here would retract the
+  // standalone-Sync claim this app exists to prove.
+  ['@qvac-poc/qvac-code-mobile', ['@qvac/sync', '@qvac-poc/qvac-code-shared']]
 ])
 const INTERNAL_NAMES = new Set([
   ...PRODUCT_PACKAGES,

@@ -1,0 +1,19 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "skipLibCheck": true,
+    "target": "ESNext"
+  },
+  "include": [
+    "index.ts",
+    "harness-child-entry.ts",
+    "tool-sandbox-child-entry.ts",
+    "lib/**/*.ts",
+    "scripts/**/*.ts",
+    "test/**/*.ts",
+    "../../../packages/sync/vendor.d.ts",
+    "../../../packages/sync/spec/**/*.d.ts"
+  ]
+}

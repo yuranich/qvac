@@ -1,0 +1,1 @@
+export const QVAC_CODE_MOBILE_PLACEHOLDER = true

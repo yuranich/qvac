@@ -1,0 +1,12 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true
+  },
+  "include": [
+    "*.ts",
+    "test/**/*.ts",
+    "../../../packages/sync/vendor.d.ts",
+    "../../../packages/sync/spec/**/*.d.ts"
+  ]
+}

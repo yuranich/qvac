@@ -2,6 +2,7 @@ import type {
   SyncDurableWork,
   SyncDurableWorkCheckpoint,
   SyncDurableWorkExecutor,
+  SyncDurableWorkGate,
   SyncDurableWorkJournalEntry
 } from '../../../spec/mesh/hyperschema/types.d.ts'
 import type { SyncProfileContract } from '../../runtime/types.ts'
@@ -65,6 +66,13 @@ export type DurableWorkQuery =
   | { readonly type: 'list-available-work' }
   | { readonly type: 'get-checkpoint-ref'; readonly workId: string }
   | { readonly type: 'list-journal'; readonly workId: string }
+  | { readonly type: 'list-gates'; readonly workId: string }
+  /**
+   * Every gate still awaiting a decision, across all work. Bounded by the
+   * number of undecided gates rather than by history, so a peer can watch it
+   * for the lifetime of the mesh without the cost growing.
+   */
+  | { readonly type: 'list-open-gates' }
   | { readonly type: 'list-executor-presence' }
 
 export interface DurableWorkResult {
@@ -72,6 +80,7 @@ export interface DurableWorkResult {
   readonly works: SyncDurableWork[]
   readonly checkpoint?: SyncDurableWorkCheckpoint | null
   readonly entries: SyncDurableWorkJournalEntry[]
+  readonly gates: SyncDurableWorkGate[]
   readonly executors: SyncDurableWorkExecutor[]
 }
 
@@ -88,6 +97,10 @@ export const durableWorkProfile: SyncProfileContract<
     'cancellation',
     'checkpoint-ref',
     'gate',
+    // Gates were writable but unreadable until `list-gates`/`list-open-gates`
+    // existed. Advertised separately so a peer can tell a runtime that can
+    // report gate state from one that can only record it.
+    'gate-read',
     'outcome',
     'executor-presence'
   ],
