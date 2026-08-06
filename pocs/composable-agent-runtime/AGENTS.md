@@ -54,6 +54,19 @@ Additional standing rules:
   package exposes a standalone Expo plugin that packages its own worker and
   writes its own contribution manifest, so a consumer can adopt Sync alone or
   Harness alone; `bun run test:pack` proves it.
+- **One application config file, owned by Assistant.** An app writes
+  `qvac.assistant.yaml`; Assistant resolves it and propagates it to the packages it
+  composes. Capability names are **derived from the installed SDK** in
+  `lib/expo/capabilities.ts` — canonical names from `SDK_DEFAULT_PLUGINS`, aliases from
+  `MODEL_TYPES`. Do not add a hand-written name table: a plugin SDK adds must be
+  selectable with no Assistant change, and `<package>/plugin` passes through for
+  third-party plugins. The generated
+  `qvac.config.json` is Assistant's artifact and the seam to the SDK Expo plugin, which
+  accepts no props — do not hand-write it, and do not add a config section for a key no
+  package reads. `inference.accelerators` prunes ggml GPU backends from the Android link
+  step via `lib/packaging/barekit-linker.ts`; those backends are runtime-dispatched, so
+  the list is a declared product choice and must never be inferred or defaulted to a
+  subset. See [ADR 0005](docs/arch/adrs/0005-application-owned-assistant-config.md).
 - **Config is a leaf utility, not a seventh runtime component.** `@qvac/config` sits
   alongside `@qvac/logging` and `@qvac/error`: it resolves a versioned, JSON-safe
   snapshot and carries it across launch boundaries, and it knows nothing about any
@@ -115,6 +128,13 @@ targeted `test:<package>` while iterating.
 
 Mobile (`bun run android`, `bun run test:pack`, `bun run validate:artifacts`) needs a
 device or a full prebuild; only run it when the change actually touches packaging.
+`bun run report:apk` reports a built APK's size, its native libraries, and which addon
+ships each one — use it whenever a change is meant to affect what ships.
+
+`expo prebuild` rewrites `packages/{sync,harness}/generated/react-native/*.js` and
+reformats `apps/task-mobile/android/settings.gradle`. Those are tracked placeholders;
+restore them with `git checkout` after a build, or the Assistant React Native suites
+fail on the filled-in bundles.
 
 ## Testing
 

@@ -1,0 +1,21 @@
+# QVAC Assistant configuration. Resolved during `expo prebuild` and propagated
+# to the packages Assistant composes, so the build produces only what is
+# declared here.
+version: 1
+
+logging:
+  level: info
+
+inference:
+  # Capabilities to build. Names come from the installed @qvac/sdk: a canonical
+  # model type (`llamacpp-completion`), an SDK alias (`llm`), or a third-party
+  # plugin specifier (`my-plugin/plugin`). Omit to keep every capability.
+  capabilities:
+    - llm
+
+  # GPU backends to ship. ggml selects among them at runtime by device
+  # capability, so this is a product choice: `[cpu]` runs on the CPU even where
+  # a Vulkan driver exists. The CPU backend is always linked. Android only.
+  # Omit to keep every backend. Available: vulkan, opencl, metal.
+  accelerators:
+    - cpu

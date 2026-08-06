@@ -39,7 +39,7 @@ afterEach(async () => {
 })
 
 describe('assistant expo plugin composition', () => {
-  it('runs real expo order as sync -> harness -> sdk -> finalizer', async () => {
+  it('runs real expo order as app-config -> sync -> harness -> sdk -> finalizer', async () => {
     const events: string[] = []
     const projectRoot = await mkdtemp(path.join(tmpdir(), 'assistant-expo-order-'))
     temporaryPaths.push(projectRoot)
@@ -51,7 +51,12 @@ describe('assistant expo plugin composition', () => {
       bundleId: 'bootstrap',
       addons: []
     })
+    await writeFile(
+      path.join(projectRoot, 'qvac.assistant.yaml'),
+      'version: 1\ninference:\n  capabilities:\n    - llm\n'
+    )
 
+    let sdkObservedPlugins: string[] | null = null
     const plugin = createAssistantExpoPlugin({
       syncBuild: async () => {
         events.push('sync')
@@ -74,7 +79,12 @@ describe('assistant expo plugin composition', () => {
         return withDangerousMod(config, [
           'android',
           async (context) => {
+            // The real SDK plugin reads this file off disk, so record what it
+            // would have seen at the moment it ran.
             events.push('sdk')
+            sdkObservedPlugins = await readJson<{ plugins: string[] }>(
+              path.join(projectRoot, 'qvac.config.json')
+            ).then((config) => config.plugins)
             await writeJson(path.join(projectRoot, 'qvac', 'addons.manifest.json'), {
               version: 1,
               bundleId: 'sdk-bundle',
@@ -96,6 +106,7 @@ describe('assistant expo plugin composition', () => {
     })
 
     expect(events).toEqual(['sync', 'harness', 'sdk'])
+    expect(sdkObservedPlugins).toEqual(['@qvac/sdk/llamacpp-completion/plugin'])
     const mergedManifest = await readJson<{
       addons: string[]
       assistantProvenance: {
@@ -106,15 +117,46 @@ describe('assistant expo plugin composition', () => {
     expect(mergedManifest.assistantProvenance.sdkSourceAddons).toEqual([
       { name: '@qvac/sdk-addon', version: '1.0.0' }
     ])
-    const stackManifest = await readJson<{ pluginExecutionOrder: string[] }>(
-      path.join(projectRoot, 'qvac', 'assistant-stack.manifest.json')
-    )
+    const stackManifest = await readJson<{
+      pluginExecutionOrder: string[]
+      sdkPluginSelection: {
+        configPath: string
+        capabilities: string[]
+        plugins: string[]
+      } | null
+    }>(path.join(projectRoot, 'qvac', 'assistant-stack.manifest.json'))
     expect(stackManifest.pluginExecutionOrder).toEqual([
+      'resolve-assistant-app-config',
       'sync-contributor-plugin',
       'harness-contributor-plugin',
       'invoke-sdk-expo-plugin',
       'finalize-assistant-stack'
     ])
+    expect(stackManifest.sdkPluginSelection).toEqual({
+      configPath: 'qvac.assistant.yaml',
+      capabilities: ['llamacpp-completion'],
+      plugins: ['@qvac/sdk/llamacpp-completion/plugin']
+    })
+  })
+
+  it('records no plugin selection when the app has no assistant config', async () => {
+    const projectRoot = await mkdtemp(path.join(tmpdir(), 'assistant-expo-no-app-config-'))
+    temporaryPaths.push(projectRoot)
+    await seedRequiredPackages(projectRoot, ['@qvac/sync', '@qvac/harness', '@qvac/sdk'])
+    await writePackageJson(projectRoot, '@qvac/sdk-addon', '1.0.0')
+    await writeJson(path.join(projectRoot, 'qvac', 'addons.manifest.json'), {
+      version: 1,
+      bundleId: 'sdk-bundle',
+      addons: ['@qvac/sdk-addon']
+    })
+    await writeContributions(projectRoot)
+
+    await composeAssistantStack({ projectRoot })
+
+    const stackManifest = await readJson<{ sdkPluginSelection: unknown }>(
+      path.join(projectRoot, 'qvac', 'assistant-stack.manifest.json')
+    )
+    expect(stackManifest.sdkPluginSelection).toBeNull()
   })
 
   it('builds workers once and clears stale failed cache entries', async () => {

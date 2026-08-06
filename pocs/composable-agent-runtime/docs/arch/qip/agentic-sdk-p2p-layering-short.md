@@ -122,9 +122,9 @@ Remote execution remains duplicate-possible until Phase 0 defines leases, fencin
 
 ## What the proof of concept does and does not prove
 
-**Demonstrated:** generated package contracts, independent desktop runtimes, Sync replication and writer admission, local Harness without Sync, automatic Sync/Harness reconstruction, SDK worker recovery, default storage/model/run IDs, logging/errors/tracing, physical iOS and Android task completion by desktop Qwen, Android background retention, durable Android relaunch, and Android SDK-process abort containment plus restart for the lightweight probe.
+**Demonstrated:** generated package contracts, independent desktop runtimes, Sync replication and writer admission, local Harness without Sync, automatic Sync/Harness reconstruction, SDK worker recovery, default storage/model/run IDs, logging/errors/tracing, physical iOS and Android task completion by desktop Qwen, Android background retention, durable Android relaunch, Android SDK-process abort containment plus restart for the lightweight probe, and one application-owned config file that selects inference capabilities and GPU backends through Assistant into the SDK bundle and native link step ([ADR 0005](../adrs/0005-application-owned-assistant-config.md): 461.0 MB → 138.6 MB Android release APK for a completion-only, CPU-only app).
 
-**Not demonstrated:** production package extraction, claim guarantees, safe interrupted-run replay, selective visibility and execution authorization, real model-loaded Android crash isolation, iOS crash isolation, accepted mobile resource budgets, complete host lifecycle policy, and production checkpoint compatibility.
+**Not demonstrated:** production package extraction, claim guarantees, safe interrupted-run replay, selective visibility and execution authorization, real model-loaded Android crash isolation, iOS crash isolation, accepted mobile resource budgets, complete host lifecycle policy, production checkpoint compatibility, and a device run of a GPU-backend-pruned build (a CPU-only APK has not yet been shown to load a model on hardware).
 
 ## Phase 0 feasibility and decision gates
 

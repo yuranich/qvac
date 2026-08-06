@@ -6,7 +6,7 @@ const commands = new Map<string, readonly string[]>([
     [
       'node',
       '--experimental-strip-types',
-      'node_modules/brittle/brittle-node.js',
+      '../../node_modules/brittle/brittle-node.js',
       'test/all.ts'
     ]
   ],
@@ -16,7 +16,7 @@ const commands = new Map<string, readonly string[]>([
     [
       'node',
       '--experimental-strip-types',
-      'node_modules/brittle/brittle-node.js',
+      '../../node_modules/brittle/brittle-node.js',
       'test/spawned.ts'
     ]
   ]

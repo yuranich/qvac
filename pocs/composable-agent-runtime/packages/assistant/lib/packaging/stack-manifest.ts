@@ -17,6 +17,7 @@ import {
   resolveAssistantPackageJsonPath
 } from './addon-inventory.ts'
 import { pinBareKitLinkerProjectRoot } from './barekit-linker.ts'
+import { resolveAssistantAppConfig } from '../expo/app-config.ts'
 import { readSdkBundlePackages } from './sdk-bundle-inventory.ts'
 import {
   ASSISTANT_MANIFEST_PROVENANCE_VERSION,
@@ -73,6 +74,7 @@ export async function writeAssistantStackArtifacts(
   const sdkBundlePackages = await readSdkBundlePackages(
     path.join(qvacDirectory, 'worker.bundle.js')
   )
+  const appConfig = await resolveAssistantAppConfig(projectRoot)
   const stackManifest: AssistantStackManifest = {
     manifestVersion: ASSISTANT_STACK_MANIFEST_VERSION,
     pluginExecutionOrder: [...PLUGIN_EXECUTION_ORDER],
@@ -103,6 +105,21 @@ export async function writeAssistantStackArtifacts(
       }
     },
     mergedAddons,
+    sdkPluginSelection:
+      appConfig === null || appConfig.capabilities === null || appConfig.plugins === null
+        ? null
+        : {
+            configPath: path.relative(projectRoot, appConfig.configPath),
+            capabilities: appConfig.capabilities,
+            plugins: appConfig.plugins
+          },
+    acceleratorSelection:
+      appConfig === null || appConfig.accelerators === null
+        ? null
+        : {
+            configPath: path.relative(projectRoot, appConfig.configPath),
+            accelerators: appConfig.accelerators
+          },
     realms: [
       {
         name: 'host',
@@ -186,7 +203,9 @@ export async function writeAssistantStackArtifacts(
     path.join(qvacDirectory, 'assistant-stack.validation.json'),
     `${JSON.stringify(validation, null, 2)}\n`
   )
-  if (pinLinkerRoot) await pinBareKitLinkerProjectRoot(projectRoot)
+  if (pinLinkerRoot) {
+    await pinBareKitLinkerProjectRoot(projectRoot, appConfig?.accelerators ?? null)
+  }
 }
 
 export async function readSdkManifest(sdkManifestPath: string): Promise<SdkAddonsManifest> {

@@ -30,6 +30,7 @@
     "test:artifacts": "vitest run packages/assistant/test/artifact-validation.test.ts",
     "test:pack": "bun run scripts/verify-clean-packages.ts",
     "validate:artifacts": "bun run scripts/validate-artifacts.ts",
+    "report:apk": "bun run scripts/report-apk.ts",
     "lint:supervisor": "bun run --cwd packages/supervisor lint",
     "typecheck": "bun run scripts/typecheck.ts",
     "verify": "bun run scripts/verify.ts"
