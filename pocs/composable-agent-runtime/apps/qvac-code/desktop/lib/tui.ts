@@ -55,8 +55,13 @@ export interface Tui {
    * against its own abort-aware promise.
    */
   promptApproval(prompt: ApprovalPromptInput, signal: AbortSignal): Promise<boolean>
-  /** Reads one line, for a free-text answer. Rejects if `signal` aborts. */
-  question(text: string, signal: AbortSignal): Promise<string>
+  /**
+   * Asks a yes/no question outside the approval flow (pairing). Shares the
+   * approval prompt's single-consumer discipline so two prompts can never fight
+   * over stdin, and rejects if `signal` aborts -- unlike an approval, an
+   * unanswered pairing question has no verdict to misreport.
+   */
+  confirm(text: string, signal: AbortSignal): Promise<boolean>
   close(): void
 }
 
@@ -98,6 +103,7 @@ export function createTui(ports: TuiPorts) {
   // keypress listener outlives the UI and a later keystroke resolves an
   // approval for a run that is already gone.
   let activePromptCleanup: (() => void) | null = null
+  let stdinQueue: Promise<void> = Promise.resolve()
 
   process.once('exit', restoreStdinSync)
 
@@ -160,6 +166,40 @@ export function createTui(ports: TuiPorts) {
     if (rawModeActive) ports.stdin.setRawMode?.(false)
   }
 
+  /**
+   * Only one prompt may own stdin at a time. Raw-mode keypress reading and line
+   * reading are mutually exclusive on one stream, so a pairing question arriving
+   * while an approval is open would otherwise take raw mode away from it and
+   * swallow the keystroke meant to answer it. Serialising is enough: both
+   * prompts are short and a phone can send a pairing request at any moment.
+   */
+  function withStdin<T>(run: () => Promise<T>): Promise<T> {
+    const previous = stdinQueue
+    let release = () => {}
+    stdinQueue = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    return previous.then(run).finally(release)
+  }
+
+  async function confirm(text: string, signal: AbortSignal) {
+    return withStdin(async () => {
+      notice(text)
+      const useRawMode = ports.stdin.isTTY === true && ports.stdin.setRawMode != null
+      if (!useRawMode) {
+        const rl = ensureLineInterface()
+        const line = await rl.question('', { signal })
+        return line.trim().toLowerCase() === YES_ANSWER
+      }
+      // An aborted pairing question is a real rejection of the wait, not a
+      // decision about anything, so it may reject rather than hang.
+      return await Promise.race([
+        promptApprovalRaw(signal),
+        abortRejection(signal)
+      ])
+    })
+  }
+
   function promptApproval(prompt: ApprovalPromptInput, signal: AbortSignal) {
     update({
       approval: {
@@ -173,7 +213,9 @@ export function createTui(ports: TuiPorts) {
     notice(`Approve ${prompt.toolName}? [y/n]`)
 
     const useRawMode = ports.stdin.isTTY === true && ports.stdin.setRawMode != null
-    const answered = useRawMode ? promptApprovalRaw(signal) : promptApprovalLineMode(signal)
+    const answered = withStdin(() =>
+      useRawMode ? promptApprovalRaw(signal) : promptApprovalLineMode(signal)
+    )
     return answered.then(function clearApprovalPrompt(value) {
       update({ approval: null })
       return value
@@ -273,10 +315,15 @@ export function createTui(ports: TuiPorts) {
     return lineInterface
   }
 
-  async function question(text: string, signal: AbortSignal) {
-    notice(text)
-    const rl = ensureLineInterface()
-    return rl.question('', { signal })
+  function abortRejection(signal: AbortSignal) {
+    return new Promise<never>((_resolve, reject) => {
+      if (signal.aborted) return reject(new Error('prompt aborted'))
+      signal.addEventListener(
+        'abort',
+        () => reject(new Error('prompt aborted')),
+        { once: true }
+      )
+    })
   }
 
   function close() {
@@ -294,7 +341,7 @@ export function createTui(ports: TuiPorts) {
     process.removeListener('exit', restoreStdinSync)
   }
 
-  const tui: Tui = { update, notice, error, promptApproval, question, close }
+  const tui: Tui = { update, notice, error, promptApproval, confirm, close }
   return tui
 }
 

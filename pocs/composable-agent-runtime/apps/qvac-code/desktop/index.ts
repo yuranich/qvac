@@ -401,12 +401,12 @@ async function approvePairingCandidates(
         const id = request.id.toString('hex')
         if (request.status !== 'pending' || handled.has(id)) continue
         handled.add(id)
-        const answer = await tui.question(
+        const approved = await tui.confirm(
           `pair writer ${request.fingerprint}? [y/n]`,
           signal
         )
         if (signal.aborted) return
-        if (answer.trim().toLowerCase() === 'y') {
+        if (approved) {
           await assistant.state.mesh.approvePairingRequest(request.id)
           tui.notice(`paired ${request.fingerprint}`)
         } else {
