@@ -196,6 +196,30 @@ describe('assistant app config', () => {
     )
   })
 
+  it('rejects an SDK plugin specifier it cannot derive a name from', () => {
+    for (const malformed of ['@qvac/sdk/plugin', '@qvac/sdk/a/b/plugin', 'nonsense']) {
+      expect(() => buildCapabilityCatalog([malformed], {}, {})).toThrow(
+        /unrecognised sdk plugin specifier/i
+      )
+    }
+  })
+
+  it('names the file when an existing generated config cannot be parsed', async () => {
+    const projectRoot = await createProject(`
+      version: 1
+      inference:
+        capabilities:
+          - llm
+    `)
+    const resolved = await resolveAssistantAppConfig(projectRoot)
+    if (resolved === null) throw new Error('expected a resolved config')
+    await writeFile(path.join(projectRoot, 'qvac.config.json'), '{ "plugins": [], }\n')
+
+    await expect(writeGeneratedSdkConfig(projectRoot, resolved)).rejects.toThrow(
+      /refusing to overwrite unparseable qvac\.config\.json/i
+    )
+  })
+
   it('fails closed when a higher-precedence SDK config would win', async () => {
     const projectRoot = await createProject(`
       version: 1

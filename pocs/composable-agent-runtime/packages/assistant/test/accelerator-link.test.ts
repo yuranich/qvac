@@ -2,10 +2,12 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { pinBareKitLinkerProjectRoot } from '../lib/packaging/barekit-linker.ts'
 
 const temporaryPaths: string[] = []
+const pocRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
 
 /**
  * Filenames a real arm64-v8a link produces for a completion-only build, taken
@@ -30,6 +32,46 @@ afterEach(async () => {
 })
 
 describe('barekit linker accelerator filter', () => {
+  it('matches the bindings the real SDK linker template declares', async () => {
+    // The prune block is appended to SDK's template and uses its `fs`, `path`,
+    // and `addonsDir` bindings. Everything else here runs against STUB_LINKER,
+    // so without this the coupling would only ever be checked against a copy:
+    // an SDK rename would keep those tests green and break every real build.
+    const template = await readFile(
+      path.resolve(
+        pocRoot,
+        'node_modules/@qvac/sdk/expo/plugins/patches/android-link.mjs'
+      ),
+      'utf8'
+    )
+
+    expect(template).toMatch(/^import fs from ['"]fs['"]$/m)
+    expect(template).toMatch(/^import path from ['"]path['"]$/m)
+    expect(template).toMatch(/^const addonsDir = /m)
+    expect(template).toMatch(/^const projectRoot = /m)
+    // Top-level await in the appended block requires the template to be an
+    // ES module that already uses it.
+    expect(template).toContain('for await (')
+  })
+
+  it('classifies the same shared objects bare-link copies', async () => {
+    const projectRoot = await createProject([
+      'libqvac-ggml-vulkan.so.1.2.3',
+      'libqvac-ggml-cpu-android_armv8.0_1.so',
+      'libplain.so.4'
+    ])
+
+    await pinBareKitLinkerProjectRoot(projectRoot, [])
+    const remaining = await runLinker(projectRoot)
+
+    // bare-link's android handler copies `\.so(\.N(\.N)*)?$`, so a versioned
+    // backend must be prunable rather than skipped and shipped unreported.
+    expect(remaining).toEqual([
+      'libplain.so.4',
+      'libqvac-ggml-cpu-android_armv8.0_1.so'
+    ])
+  })
+
   it('keeps only declared GPU backends, CPU, and unrecognised backends', async () => {
     const projectRoot = await createProject()
 
@@ -117,7 +159,7 @@ describe('barekit linker accelerator filter', () => {
   })
 })
 
-async function createProject() {
+async function createProject(libraries: readonly string[] = LINKED_LIBRARIES) {
   const projectRoot = await mkdtemp(path.join(tmpdir(), 'assistant-accelerator-'))
   temporaryPaths.push(projectRoot)
   await writeFile(
@@ -132,7 +174,7 @@ async function createProject() {
     `${JSON.stringify({ name: 'react-native-bare-kit', version: '0.14.0' }, null, 2)}\n`
   )
   for (const platform of ['android', 'ios']) {
-    await writeFile(path.join(bareKitRoot, platform, 'link.mjs'), STUB_LINKER)
+    await writeFile(path.join(bareKitRoot, platform, 'link.mjs'), stubLinker(libraries))
   }
   return projectRoot
 }
@@ -173,7 +215,14 @@ function runLinkerOutput(projectRoot: string) {
   return result.stdout
 }
 
-const STUB_LINKER = `import fs from 'fs'
+/**
+ * Stands in for `bare-link`: writes the files a link would have copied, using
+ * the same bindings the SDK template declares. The
+ * "matches the bindings the real SDK linker template declares" case is what
+ * keeps this replica honest.
+ */
+function stubLinker(libraries: readonly string[]) {
+  return `import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
@@ -184,7 +233,8 @@ const addonsDir = path.join(__dirname, 'src', 'main', 'addons')
 const architectureDir = path.join(addonsDir, 'arm64-v8a')
 fs.rmSync(addonsDir, { recursive: true, force: true })
 fs.mkdirSync(architectureDir, { recursive: true })
-for (const name of ${JSON.stringify(LINKED_LIBRARIES)}) {
+for (const name of ${JSON.stringify(libraries)}) {
   fs.writeFileSync(path.join(architectureDir, name), name)
 }
 `
+}

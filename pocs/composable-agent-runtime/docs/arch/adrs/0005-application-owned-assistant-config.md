@@ -134,11 +134,12 @@ variants (9.6 MB total) are also kept: ggml dispatches among them by CPU feature
 detection, so pinning one would silently exclude devices. Both are recorded, not
 claimed.
 
-For reference, the real assistant app at `wb/mobile` hand-writes the same
-five-plugin `qvac.config.json` this ADR generates, and does *not* strip
-backends — it needs Vulkan at runtime (`backendDevice: "vulkan"` for Android
-OCR, `hwCapability.device` for the LLM), which is exactly why the choice is
-declared per app rather than optimised automatically.
+For reference, the
+[assistant app](https://github.com/tetherto/qvac-app/tree/main/mobile)
+hand-writes the same five-plugin `qvac.config.json` this ADR generates, and
+does *not* strip backends — it needs Vulkan at runtime (`backendDevice:
+"vulkan"` for Android OCR, `hwCapability.device` for the LLM), which is exactly
+why the choice is declared per app rather than optimised automatically.
 
 ## Consequences
 

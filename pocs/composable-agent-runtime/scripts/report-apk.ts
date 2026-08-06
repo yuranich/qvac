@@ -1,7 +1,8 @@
 import { open, readdir, readFile, stat, writeFile, type FileHandle } from 'node:fs/promises'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-const POC_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
+const POC_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const DEFAULT_PROJECT_ROOT = path.join(POC_ROOT, 'apps', 'task-mobile')
 const DEFAULT_APK = path.join(
   'android',
@@ -17,7 +18,9 @@ const UNATTRIBUTED = '(host runtime)'
 const END_RECORD_LENGTH = 22
 const MAX_ZIP_COMMENT = 0xffff
 /** `libqvac-speech-ggml-cpu-android_armv9.2_2.so` reports as backend `cpu`. */
-const BACKEND_PATTERN = /-ggml-([a-z0-9]+)(?:[-_.]|\.so$)/
+const BACKEND_PATTERN = /-ggml-([a-z0-9]+)(?:[-_.]|\.so(?:\.[0-9]+(?:\.[0-9]+)*)?$)/
+/** Mirrors bare-link, which also copies SONAME-versioned `libfoo.so.1.2.3`. */
+const SHARED_OBJECT_PATTERN = /\.so(?:\.[0-9]+(?:\.[0-9]+)*)?$/
 
 interface ZipEntry {
   readonly name: string
@@ -81,7 +84,10 @@ async function main() {
   const owners = await mapLibraryOwners(options.projectRoot, linkedAddons)
 
   const libraries = entries
-    .filter((entry) => entry.name.startsWith(NATIVE_LIBRARY_PREFIX) && entry.name.endsWith('.so'))
+    .filter(
+      (entry) =>
+        entry.name.startsWith(NATIVE_LIBRARY_PREFIX) && SHARED_OBJECT_PATTERN.test(entry.name)
+    )
     .map((entry) => toLibraryRow(entry, owners))
     .sort((left, right) => right.compressedSize - left.compressedSize)
 
@@ -344,15 +350,29 @@ async function readZipCentralDirectory(
     ) {
       throw new Error(`ZIP64 archives are not supported: ${apkPath}`)
     }
+    // Both are unvalidated 32-bit fields. Check them against the file before
+    // allocating, so a corrupt trailer cannot demand a multi-gigabyte buffer.
+    if (directoryOffset + directorySize > apkSize) {
+      throw new Error(
+        `Zip central directory runs past the end of ${apkPath}: ` +
+          `offset ${directoryOffset} + size ${directorySize} > ${apkSize}`
+      )
+    }
 
     const directory = await readAt(handle, directoryOffset, directorySize)
     const entries: ZipEntry[] = []
     let cursor = 0
     for (let index = 0; index < entryCount; index += 1) {
-      if (directory.readUInt32LE(cursor) !== 0x02014b50) {
+      if (
+        cursor + 46 > directory.length ||
+        directory.readUInt32LE(cursor) !== 0x02014b50
+      ) {
         throw new Error(`Malformed zip central directory entry ${index} in ${apkPath}`)
       }
       const nameLength = directory.readUInt16LE(cursor + 28)
+      if (cursor + 46 + nameLength > directory.length) {
+        throw new Error(`Truncated zip central directory entry ${index} in ${apkPath}`)
+      }
       entries.push({
         name: directory.toString('utf8', cursor + 46, cursor + 46 + nameLength),
         compressedSize: directory.readUInt32LE(cursor + 20),
@@ -378,7 +398,11 @@ async function readAt(handle: FileHandle, position: number, length: number) {
 
 function findEndOfCentralDirectory(trailer: Buffer, apkPath: string) {
   for (let offset = trailer.length - END_RECORD_LENGTH; offset >= 0; offset -= 1) {
-    if (trailer.readUInt32LE(offset) === 0x06054b50) return offset
+    if (trailer.readUInt32LE(offset) !== 0x06054b50) continue
+    // The signature can also occur inside a zip comment, so require the
+    // record's own comment length to account for the rest of the file.
+    const commentLength = trailer.readUInt16LE(offset + 20)
+    if (offset + END_RECORD_LENGTH + commentLength === trailer.length) return offset
   }
   throw new Error(`Not a zip archive: ${apkPath}`)
 }

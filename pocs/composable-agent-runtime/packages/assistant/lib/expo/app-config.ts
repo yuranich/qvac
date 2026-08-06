@@ -142,7 +142,20 @@ async function assertGeneratedOrAbsent(targetPath: string, configPath: string) {
   } catch {
     return
   }
-  const parsed: unknown = JSON.parse(source)
+  // A hand-written file is the case most likely to be malformed, so a parse
+  // failure has to name the file and say what to do rather than surfacing a
+  // bare SyntaxError from the middle of a prebuild.
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(source)
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : String(cause)
+    throw new Error(
+      `Refusing to overwrite unparseable ${GENERATED_SDK_CONFIG_FILENAME} at ${targetPath}: ` +
+        `${message}. Assistant generates this file from ${path.basename(configPath)}; ` +
+        'delete it, or fix its JSON if it was hand-written.'
+    )
+  }
   if (isObject(parsed) && parsed['//'] === GENERATED_SDK_CONFIG_MARKER) return
   throw new Error(
     `Refusing to overwrite hand-written ${GENERATED_SDK_CONFIG_FILENAME} at ${targetPath}. ` +

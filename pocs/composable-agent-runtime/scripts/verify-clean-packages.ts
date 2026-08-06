@@ -401,15 +401,33 @@ async function assertAcceleratorSelectionPropagated(
   if (!androidLinker.includes('pruneUndeclaredAccelerators')) {
     throw new Error('android linker is missing the declared accelerator prune step')
   }
-  for (const backend of ['vulkan', 'opencl', 'metal']) {
-    if (!androidLinker.includes(`"${backend}"`)) {
-      throw new Error(`android linker prune step does not remove ${backend}`)
-    }
+  // Read the generated sets rather than substring-matching the file: an
+  // inverted removable/kept split would still contain every backend name and
+  // would otherwise pass while deleting exactly the wrong libraries.
+  const removable = readGeneratedSet(androidLinker, 'removableAccelerators')
+  const kept = readGeneratedSet(androidLinker, 'keptAccelerators')
+  if (removable.join(',') !== 'metal,opencl,vulkan') {
+    throw new Error(`android linker removes the wrong backends: ${JSON.stringify(removable)}`)
+  }
+  if (kept.join(',') !== 'cpu') {
+    throw new Error(`android linker keeps the wrong backends: ${JSON.stringify(kept)}`)
   }
   const iosLinker = await readFile(join(bareKitRoot, 'ios', 'link.mjs'), 'utf8')
   if (iosLinker.includes('pruneUndeclaredAccelerators')) {
     throw new Error('ios linker must not carry the android-only accelerator prune step')
   }
+}
+
+function readGeneratedSet(source: string, name: string) {
+  const match = new RegExp(`const ${name} = new Set\\((\\[[^\\]]*\\])\\)`).exec(source)
+  if (!match?.[1]) {
+    throw new Error(`android linker does not declare ${name}`)
+  }
+  const parsed: unknown = JSON.parse(match[1])
+  if (!Array.isArray(parsed) || !parsed.every((entry) => typeof entry === 'string')) {
+    throw new Error(`android linker ${name} is not a list of strings`)
+  }
+  return [...parsed].sort()
 }
 
 async function assertManifestAwareBareKitLinkers(projectRoot: string) {

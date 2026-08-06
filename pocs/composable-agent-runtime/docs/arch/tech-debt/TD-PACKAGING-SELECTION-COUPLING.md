@@ -29,6 +29,21 @@ break us, and do we edit Assistant every time a plugin is added?"
 | 7 | **Backend list** `['vulkan','opencl','metal','cpu']`, hand-written | **Silent** — a new backend is kept (fail-safe) but can never be declared or dropped | Assistant edit required per new backend |
 | 8 | **`-ggml-<backend>.so` filename convention** | **Silent** — a differently named backend library is never pruned | Assistant edit required if naming changes |
 
+`@qvac/vla-ggml` already ships a `libqvac-ggml-hip.so` (linux-x64 only, so it
+never reaches an Android build). It is a live instance of item 7: it cannot be
+declared or dropped, and is kept and logged.
+
+Item 1 is listed as costing nothing, which holds while first-party plugins keep
+the `@qvac/sdk/<type>/plugin` shape. A plugin moved to a sibling package would
+fail the pattern and hard-fail every prebuild — loud, but not free.
+
+The backend classifier is duplicated: `lib/packaging/barekit-linker.ts` embeds
+it in generated code and `scripts/report-apk.ts` has its own copy for reading a
+built APK. They must stay in step or the report stops describing what was
+actually pruned. Sharing them would mean a new public export, which is the
+opposite of what this PoC is judged on, so the duplication is deliberate and
+both carry the same comment.
+
 Items 1–3 are the ones the question was really about, and they now cost
 nothing. Items 7 and 8 are the real debt: both are Assistant guessing at data
 that only the addon packages have.
@@ -49,8 +64,9 @@ There is no filter argument and no manifest key. The addons manifest selects
 after the copy, by deleting files it recognises by name — which is why item 8
 exists at all.
 
-The real assistant app (`wb/mobile`) does not attempt this and ships every
-backend, so this is not a solved problem elsewhere in the org.
+The [assistant app](https://github.com/tetherto/qvac-app/tree/main/mobile) does
+not attempt this and ships every backend, so this is not a solved problem
+elsewhere in the org.
 
 ## Upstream asks, in priority order
 
@@ -85,3 +101,9 @@ convention Assistant maintains into data the packages own.
 - `bun run report:apk` reads the backends actually present in a built APK, so
   the claim "this build ships CPU only" is checked against the artifact rather
   than against the config that requested it.
+- The app config is resolved twice per prebuild — once to generate the SDK
+  config, once again in `packaging/stack-manifest.ts` to record what was
+  selected. Cheap, but it means the manifest could in principle record a
+  different file than the one propagated. Threading the resolved config through
+  finalization would close that, at the cost of a parameter that only exists
+  for a race nobody has hit.
