@@ -10,7 +10,7 @@ import type {
   CodeTurnStatus,
   CodeTurnView
 } from '@qvac-poc/qvac-code-shared'
-import { visibleWidth, type Theme } from './tui-theme.ts'
+import { sanitizeTerminalText, visibleWidth, type Theme } from './tui-theme.ts'
 
 export type HeaderPairing =
   | { readonly kind: 'unpaired'; readonly inviteUri: string }
@@ -186,7 +186,9 @@ export function renderScreen(model: ScreenModel, theme: Theme): readonly string[
 }
 
 export function renderStatusLine(text: string, theme: Theme): string {
-  return theme.dim(`${STATUS_PREFIX}${text}`)
+  // Status lines bypass clipToWidth (they are not part of a laid-out frame),
+  // so they sanitize here: a notice can quote a peer-authored tool summary.
+  return theme.dim(`${STATUS_PREFIX}${sanitizeTerminalText(text)}`)
 }
 
 // ---- header ----
@@ -367,7 +369,9 @@ function renderBoxTopBorder(title: string | null, theme: Theme, safeWidth: numbe
   if (title == null || title.length === 0) {
     return `${BOX_TOP_LEFT}${BOX_HORIZONTAL.repeat(Math.max(safeWidth - 2, 0))}${BOX_TOP_RIGHT}`
   }
-  const labelBudget = Math.max(safeWidth - BOX_OVERHEAD, 0)
+  // One further column is reserved for the closing corner: without it the
+  // label can consume the whole line and clipToWidth drops the `┐`.
+  const labelBudget = Math.max(safeWidth - BOX_OVERHEAD - 1, 0)
   const label = theme.bold(clipToWidth(title, labelBudget))
   const prefix = `${BOX_TOP_LEFT}${BOX_HORIZONTAL} ${label} `
   const fillerWidth = Math.max(safeWidth - visibleWidth(prefix) - 1, 0)
@@ -445,9 +449,14 @@ function padEndVisible(text: string, width: number): string {
 // Clips to at most `width` visible columns without ever splitting an ANSI
 // escape sequence in half, so a truncated colored line cannot leak raw
 // escape bytes into the terminal.
-function clipToWidth(text: string, width: number): string {
+function clipToWidth(rawText: string, width: number): string {
   const safeWidth = Math.max(width, 0)
   if (safeWidth === 0) return ''
+  // Every rendered line funnels through here, which makes it the one place
+  // that can guarantee no peer-authored control character reaches the
+  // terminal. Sanitizing at each call site instead would mean getting it
+  // right in a dozen places and staying right as blocks are added.
+  const text = sanitizeTerminalText(rawText)
   if (visibleWidth(text) <= safeWidth) return text
   let result = ''
   let consumed = 0

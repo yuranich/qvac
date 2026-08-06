@@ -4,7 +4,7 @@
 // or a line back.
 import { emitKeypressEvents, type Key } from 'node:readline'
 import { createInterface, type Interface as ReadlinePromiseInterface } from 'node:readline/promises'
-import { createTheme, isColorEnabledFor } from './tui-theme.ts'
+import { createTheme, isColorEnabledFor, visibleWidth } from './tui-theme.ts'
 import { renderScreen, renderStatusLine, type ScreenModel } from './tui-render.ts'
 
 const REDRAW_THROTTLE_MS = 50
@@ -94,6 +94,10 @@ export function createTui(ports: TuiPorts) {
   let rawModeActive = false
   let keypressEventsReady = false
   let lineInterface: ReadlinePromiseInterface | null = null
+  // Held so close() can tear down a prompt that is still waiting: otherwise the
+  // keypress listener outlives the UI and a later keystroke resolves an
+  // approval for a run that is already gone.
+  let activePromptCleanup: (() => void) | null = null
 
   process.once('exit', restoreStdinSync)
 
@@ -106,7 +110,12 @@ export function createTui(ports: TuiPorts) {
     // between frames) alone.
     const erase = lastFrameLineCount > 0 ? `\x1b[${lastFrameLineCount}A\x1b[0J` : ''
     ports.stdout.write(erase + frame.join('\n') + (frame.length > 0 ? '\n' : ''))
-    lastFrameLineCount = frame.length
+    // Count the terminal rows the frame actually occupies, not its array
+    // length. A line wider than the terminal wraps onto further rows, and the
+    // unpaired invite URI is deliberately over-wide -- which is the default
+    // first-run state, so counting elements would drift the display on every
+    // redraw for every new user.
+    lastFrameLineCount = countTerminalRows(frame, model.width)
   }
 
   function scheduleRedraw() {
@@ -184,9 +193,20 @@ export function createTui(ports: TuiPorts) {
         signal.removeEventListener('abort', onAbort)
         ports.stdin.setRawMode?.(false)
         rawModeActive = false
+        if (activePromptCleanup === cleanup) activePromptCleanup = null
       }
 
       function onKeypress(_chunk: string, key: Key | undefined) {
+        // Raw mode disables ISIG, so Ctrl+C arrives here as a keystroke rather
+        // than a signal. Without this the terminal looks hung during a prompt.
+        if (key?.ctrl === true && key.name === 'c') {
+          cleanup()
+          process.kill(process.pid, 'SIGINT')
+          return
+        }
+        // A modifier combination is not an answer: Ctrl+Y must not approve a
+        // filesystem write.
+        if (key?.ctrl === true || key?.meta === true) return
         const name = key?.name?.toLowerCase()
         if (name === YES_ANSWER) {
           cleanup()
@@ -207,6 +227,10 @@ export function createTui(ports: TuiPorts) {
         // Deliberately does not resolve or reject; see the doc comment.
       }
 
+      // Discard anything typed before this prompt appeared. A `y` queued for an
+      // earlier question would otherwise silently approve this tool call.
+      ports.stdin.read?.()
+      activePromptCleanup = cleanup
       ports.stdin.on('keypress', onKeypress)
       signal.addEventListener('abort', onAbort, { once: true })
     })
@@ -262,6 +286,8 @@ export function createTui(ports: TuiPorts) {
       clearTimeout(redrawTimer)
       redrawTimer = null
     }
+    activePromptCleanup?.()
+    activePromptCleanup = null
     restoreStdinSync()
     lineInterface?.close()
     lineInterface = null
@@ -276,4 +302,17 @@ function neverSettlingPromise() {
   return new Promise<boolean>(function executor() {
     // Deliberately never calls resolve/reject; see Tui.promptApproval.
   })
+}
+
+/**
+ * Terminal rows a frame occupies once the terminal wraps over-wide lines. A
+ * zero-width line still occupies one row.
+ */
+function countTerminalRows(frame: readonly string[], width: number) {
+  const safeWidth = Math.max(width, 1)
+  let rows = 0
+  for (const line of frame) {
+    rows += Math.max(1, Math.ceil(visibleWidth(line) / safeWidth))
+  }
+  return rows
 }

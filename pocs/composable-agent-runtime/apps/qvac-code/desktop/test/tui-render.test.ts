@@ -417,3 +417,101 @@ describe('renderScreen honours height at any terminal size', function () {
     expect(screenAt(6).join('\n')).toContain('bun test')
   })
 })
+
+/**
+ * Session titles, prompts, tool summaries and approval detail lines all arrive
+ * through a replicated journal that any admitted peer can write. A carriage
+ * return lets such a peer overwrite a row this process already drew, and a CSI
+ * sequence lets it clear the screen from inside the approval prompt the user is
+ * about to answer. Neither is theoretical: both are one JSON string away.
+ */
+describe('peer-authored text cannot drive the terminal', function () {
+  const plain = createTheme({ enabled: false })
+  // Built rather than written literally: an invisible escape byte in source is
+  // too easy to lose to an editor or a copy-paste.
+  const ESC = String.fromCharCode(27)
+
+  test('strips a carriage return from a session title', function () {
+    const [row] = renderSessions(
+      [
+        {
+          sessionId: 's1',
+          title: `approved by you\rdenied`,
+          turnCount: 1,
+          status: 'completed',
+          updatedAt: 0,
+          selected: true
+        }
+      ],
+      plain,
+      80,
+      0
+    )
+    expect(row).not.toContain('\r')
+    expect(row).toContain('approved by you')
+  })
+
+  test('strips a screen-clearing sequence from an approval detail line', function () {
+    const lines = renderApproval(
+      {
+        toolName: 'shell',
+        summary: 'shell bun test',
+        detail: [`command: ${ESC}[2J${ESC}[Hbun test`],
+        decidedBy: null,
+        verdict: null
+      },
+      plain,
+      60
+    )
+    const text = lines.join('\n')
+    expect(text).not.toContain(ESC)
+    expect(text).toContain('bun test')
+  })
+
+  test('strips an OSC window-title sequence from transcript content', function () {
+    const lines = renderTranscript(
+      {
+        turnWorkId: 'w',
+        sessionId: 's1',
+        seq: 0,
+        prompt: 'p',
+        status: 'running',
+        claimedBy: 'code-mac-abc',
+        blocks: [{ kind: 'assistant', text: `safe${ESC}]0;pwned text` }],
+        openApproval: null,
+        finalText: null,
+        truncated: false,
+        updatedAt: 0
+      },
+      plain,
+      80,
+      0
+    )
+    const text = lines.join('\n')
+    expect(text).not.toContain(ESC)
+    expect(text).not.toContain(String.fromCharCode(7))
+    expect(text).toContain('safe')
+  })
+
+  test('strips control characters from a status line', function () {
+    expect(renderStatusLine('tool \rwiped', plain)).not.toContain('\r')
+  })
+
+  test('keeps the closing corner of a boxed header at any width', function () {
+    for (const width of [8, 12, 20, 40, 80]) {
+      const [top] = renderHeader(
+        {
+          projectLabel: 'x'.repeat(40),
+          projectRoot: '/repo',
+          executorId: 'code-mac-abc',
+          model: 'Qwen',
+          pairing: { kind: 'offline' },
+          skills: []
+        },
+        plain,
+        width
+      )
+      expect(top?.endsWith('┐')).toBe(true)
+    }
+  })
+})

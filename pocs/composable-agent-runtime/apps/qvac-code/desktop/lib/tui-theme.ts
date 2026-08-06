@@ -97,6 +97,33 @@ export function stripAnsi(text: string) {
   return text.replace(ANSI_SGR_PATTERN, '')
 }
 
+/**
+ * Every string this UI renders that did not originate here -- a session title,
+ * a prompt, a tool summary, an approval detail line -- reached us through a
+ * replicated journal any admitted peer can write. A carriage return lets such a
+ * peer overwrite a row this process already drew, and a CSI or OSC sequence lets
+ * it clear the screen or retitle the window from inside the approval prompt the
+ * user is about to answer. Neither is theoretical: both are one JSON string
+ * away. Strip anything that can move the cursor or change terminal state, and
+ * keep only the tab, which the wrapper measures.
+ */
+export function sanitizeTerminalText(text: string) {
+  let sanitized = ''
+  for (const char of text) {
+    const codePoint = char.codePointAt(0) ?? 0
+    if (codePoint === 0x09) {
+      sanitized += ' '
+      continue
+    }
+    // C0 controls, DEL, and the C1 range that doubles as 8-bit escapes.
+    if (codePoint < 0x20 || codePoint === 0x7f || (codePoint >= 0x80 && codePoint <= 0x9f)) {
+      continue
+    }
+    sanitized += char
+  }
+  return sanitized
+}
+
 // Counts display columns, not UTF-16 code units: ANSI escapes cost zero
 // columns and a wide/CJK codepoint costs two, or box-drawn borders would
 // drift out of alignment the moment non-Latin text entered a line.
