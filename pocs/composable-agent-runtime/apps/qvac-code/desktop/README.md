@@ -58,6 +58,39 @@ skill's declared permissions — the project root is the only write root. The
 in-process path checks are defence in depth, and they run in both halves of the
 skill.
 
+## Observed with Qwen3.5 9B Q4: tool calls arrive as prose
+
+On the runs recorded so far, the model reasons correctly about which tools to use
+— its thinking block says as much — and then writes the calls as text in a code
+fence instead of emitting a structured tool call. Nothing executes, and the turn
+completes with an empty transcript of tool activity.
+
+The wiring around it is verified, layer by layer, so this is a model-behaviour
+result rather than a plumbing one:
+
+- the skill bundle resolves to seven tool grants;
+- the host provider contributes seven `AgentTool` schemas;
+- `createToolGate` yields all seven for the registered policy;
+- each schema validates against `@qvac/sdk`'s own `toolSchema`;
+- `assistant.listSkills()` returns `qvac-code`, so the application's worker entry
+  and its bundle really are what the harness loaded;
+- the registration is JSON round-tripped whole across the harness wire, so
+  `toolPolicy` arrives intact;
+- and the brokered adapter forwards `tools` and sets `toolSupport: true` on load,
+  which is what switches the model's tool template on.
+
+So **the end-to-end path is proven up to the model, and not through it.** Treat
+"an agent edits files on the laptop from a phone" as demonstrated for the
+transport, the claim, the approval gates and the sandbox, and as *not yet*
+demonstrated for autonomous tool use by this particular model at this quantisation.
+
+Levers worth trying next, in order of expected value: a larger or less quantised
+model; the SDK's `dynamic` tools mode, which anchors the tool block after the last
+user message rather than once after the system prompt (the harness does not set
+`toolsMode` today, so it gets `static`); and a shorter system prompt, since
+SKILL.md currently *describes* the tools in prose and a small model may be
+imitating that style.
+
 ## One executor per project
 
 `serve` refuses to start when another live executor advertises the same project,
