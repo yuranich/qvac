@@ -43,45 +43,37 @@ inference:
 
 - **Assistant owns the file and its schema; SDK owns the vocabulary.**
   Assistant invents no capability names. The catalog is derived at build time
-  from what the installed SDK publishes: canonical names from the specifiers in
-  `SDK_DEFAULT_PLUGINS` (`@qvac/sdk/llamacpp-completion/plugin` →
-  `llamacpp-completion`, which is SDK's own `ModelType` value), and aliases
-  from `MODEL_TYPES` minus `ModelType` (`llm`, `ocr`, `diffusion`, …). A plugin
-  a future SDK adds is selectable the moment SDK ships it, with no change here.
-  A name ending in `/plugin` is passed through verbatim, so the third-party
-  plugins SDK documents (`<package>/plugin`) work without Assistant knowing
-  them. Coupling is inventoried in
-  [TD-PACKAGING-SELECTION-COUPLING](../tech-debt/TD-PACKAGING-SELECTION-COUPLING.md).
-- **Propagation is generation, not reach-in.** A new first step in the Assistant
-  Expo plugin (`resolve-assistant-app-config`) resolves the YAML and writes a
-  generated `qvac.config.json`. The SDK plugin then runs unmodified and finds
-  the file it already looks for. Execution order becomes
-  `app-config → sync → harness → sdk → finalize`.
-- **The generated file is Assistant's artifact.** It carries a `"//"` marker,
-  is gitignored, and Assistant refuses to overwrite a `qvac.config.json` it did
-  not write. A higher-precedence `qvac.config.{ts,mjs,js}` is a hard error
-  rather than a silently-ignored generated file.
-- **Accelerators are declared, not inferred.** `inference.accelerators` names
-  the GPU backends the app ships. An addon publishes one prebuilt library per
-  backend and ggml selects among them at runtime from device capability, so
-  these are not dead code — dropping `vulkan` means the app runs on the CPU
-  even where a Vulkan driver exists. ggml's CPU backend is its base and is
-  always linked; `cpu` is accepted as an entry so `[cpu]` reads as "CPU only",
-  and an unrecognised `-ggml-*.so` is never removed, so a backend introduced
-  after this list cannot silently vanish from a build.
-- **Backend pruning is Android-only.** `bare-link` copies loose `.so` files on
-  Android but builds signed `.framework`s around `.dylib`s on Apple platforms.
-  Pruning a signed framework is a different operation and is not attempted, so
-  an iOS build still ships every backend. The linker patch is therefore applied
-  to `android/link.mjs` only, rather than shipping a no-op on iOS.
-- **Absence means today's behaviour.** No `qvac.assistant.yaml` keeps every
-  built-in capability and every backend, as does a file with no `inference`
-  section or no `accelerators` list. An empty `accelerators: []` is a
-  deliberate CPU-only build and is not the same as absence. Selection is
-  opt-in; nothing silently shrinks an existing app's build.
+  from the installed SDK: canonical names from the `SDK_DEFAULT_PLUGINS`
+  specifiers (`@qvac/sdk/llamacpp-completion/plugin` → `llamacpp-completion`,
+  SDK's own `ModelType` value), aliases from `MODEL_TYPES` minus `ModelType`
+  (`llm`, `ocr`, …). A plugin a future SDK ships is selectable with no change
+  here, and a name ending in `/plugin` passes through verbatim, so third-party
+  plugins work without Assistant knowing them.
+- **Propagation is generation, not reach-in.** A first plugin step
+  (`resolve-assistant-app-config`) writes a generated `qvac.config.json`, which
+  the unmodified SDK plugin then finds. Execution order becomes
+  `app-config → sync → harness → sdk → finalize`. The generated file carries a
+  `"//"` marker and is gitignored; Assistant refuses to overwrite one it did not
+  write, and treats a higher-precedence `qvac.config.{ts,mjs,js}` as a hard
+  error rather than silently generating a file that would be ignored.
+- **Accelerators are declared, not inferred.** An addon publishes one prebuilt
+  library per backend and ggml selects among them at runtime from device
+  capability, so these are not dead code: dropping `vulkan` means the app runs
+  on the CPU even where a Vulkan driver exists. ggml's CPU backend is always
+  linked (`cpu` is accepted so `[cpu]` reads as "CPU only"), and an
+  unrecognised `-ggml-*` library is reported rather than removed.
+- **Backend pruning is Android-only.** `bare-link` copies loose shared objects
+  on Android but builds signed `.framework`s around `.dylib`s on Apple
+  platforms. Rewriting a signed framework is a different operation and is not
+  attempted, so the patch applies to `android/link.mjs` only rather than
+  shipping a no-op on iOS, and an iOS build still ships every backend.
+- **Absence means today's behaviour.** No file, no `inference` section, or no
+  `accelerators` list each keep everything. An empty `accelerators: []` is a
+  deliberate CPU-only build, not absence. Nothing silently shrinks an existing
+  app's build.
 - **The selection is recorded.** `assistant-stack.manifest.json` gains
-  `sdkPluginSelection` (config path, capabilities, plugin specifiers), so what a
-  binary contains is auditable after the fact rather than inferred from its size.
+  `sdkPluginSelection` and `acceleratorSelection`, so what a binary contains is
+  auditable rather than inferred from its size.
 
 Out of scope: propagating the file into the *runtime* config snapshot on device
 (the YAML is a build-host artifact and is not shipped); per-model or per-device
@@ -94,7 +86,7 @@ would be inventing surface.
 Same app, same commit, `expo prebuild --clean` plus `assembleRelease` on
 arm64-v8a, measured with `bun run report:apk`:
 
-| | Baseline (no config) | `capabilities: [completion]` | `+ accelerators: [cpu]` |
+| | no config | `capabilities: [llm]` | `+ accelerators: [cpu]` |
 |---|---|---|---|
 | APK | 461.0 MB | 243.4 MB | **138.6 MB (−69.9%)** |
 | Native libraries | 424.8 MB | 210.3 MB | 105.5 MB |
@@ -106,79 +98,66 @@ arm64-v8a, measured with `bun run report:apk`:
 | SDK worker bundle | 11.2 MB | 8.7 MB | 8.7 MB |
 
 Decoding the worker bundle's file inventory confirms the selection reached it:
-one plugin module (`.../plugins/llamacpp-completion/plugin.js`) out of eleven,
-and `@qvac/llm-llamacpp` as the only inference addon among the `@qvac` packages
-present. Grepping the bundle for plugin paths is *not* evidence — every
+one plugin module out of eleven, and `@qvac/llm-llamacpp` as the only inference
+addon present. Grepping the bundle for plugin paths is *not* evidence — every
 specifier still appears in the module map; only the decoded file inventory
 distinguishes an included module from a recorded path.
 
-The ten unselected inference addons and `bare-ffmpeg` are gone, taking their
-sidecar backends with them — the largest single removals are
-`libqvac-speech-ggml-vulkan.so` (57.7 MB), `libqvac-diffusion-ggml-vulkan.so`
-(48.3 MB), `libqvac__diffusion-cpp` (34.4 MB), and `libbare-ffmpeg` (26.0 MB).
-
 **Capability selection alone was not sufficient.** After it, two files held two
-thirds of the remaining 243.4 MB: `libqvac-ggml-vulkan.so` (103.0 MB, shipped by
-`@qvac/llm-llamacpp` itself, so no capability choice removes it) and
-`libbare-kit.so` (61.9 MB, the Bare host runtime). Declaring `accelerators:
-[cpu]` removes the first, and the build log shows the linker doing it:
+thirds of the remaining 243.4 MB. Declaring `accelerators: [cpu]` removes the
+first:
 
 ```
 [QVAC] Dropped undeclared opencl backend libqvac-ggml-opencl.so
 [QVAC] Dropped undeclared vulkan backend libqvac-ggml-vulkan.so
 ```
 
-`libbare-kit.so` remains the single largest file at 61.9 MB — 45% of the final
-APK — and nothing in this ADR addresses it. The seven CPU microarchitecture
-variants (9.6 MB total) are also kept: ggml dispatches among them by CPU feature
-detection, so pinning one would silently exclude devices. Both are recorded, not
-claimed.
+`libqvac-ggml-vulkan.so` (103.0 MB) is shipped by `@qvac/llm-llamacpp` itself,
+so no capability choice reaches it. The other is `libbare-kit.so` (61.9 MB, the
+Bare host runtime), which survives both selections and is now 45% of the final
+APK. The seven CPU microarchitecture variants (9.6 MB) are kept deliberately:
+ggml dispatches among them by feature detection, so pinning one would silently
+exclude devices.
 
-For reference, the
-[assistant app](https://github.com/tetherto/qvac-app/tree/main/mobile)
-hand-writes the same five-plugin `qvac.config.json` this ADR generates, and
-does *not* strip backends — it needs Vulkan at runtime (`backendDevice:
-"vulkan"` for Android OCR, `hwCapability.device` for the LLM), which is exactly
-why the choice is declared per app rather than optimised automatically.
+That the [assistant app](https://github.com/tetherto/qvac-app/tree/main/mobile)
+needs Vulkan at runtime (`backendDevice: "vulkan"` for Android OCR,
+`hwCapability.device` for the LLM) is exactly why backends are declared per app
+rather than optimised automatically.
 
 ## Consequences
 
 ### Positive
 
-- An app ships the capabilities and backends it declares. A completion-only,
-  CPU-only assistant is a 138.6 MB APK instead of a 461.0 MB one, and the
-  residue is attributable to one named file (`libbare-kit.so`) rather than to
-  eleven unused capabilities and three GPU backends.
-- The facade is honest: configuring Assistant configures what Assistant
-  composes, with no second config file to discover.
-- Capability names read as product vocabulary, not as bundler internals.
-- What a binary contains is recorded in the stack manifest.
+- An app ships the capabilities and backends it declares, and the residue is
+  attributable to one named file rather than to eleven unused capabilities and
+  three GPU backends.
+- Configuring Assistant configures what Assistant composes; there is no second
+  config file to discover.
+- Capability names are SDK's own, so the vocabulary cannot drift from the
+  plugins that implement it.
 
 ### Trade-offs
 
 - Assistant reads SDK's plugin list and model-type vocabulary at build time.
-  That is a composer's job and it costs nothing per plugin, but it does bind
-  Assistant to two SDK exports (`SDK_DEFAULT_PLUGINS`, `MODEL_TYPES`) and to
-  the `@qvac/sdk/<type>/plugin` specifier shape. All three fail loudly.
+  That is a composer's job and costs nothing per plugin, but it binds Assistant
+  to two SDK exports and to the `@qvac/sdk/<type>/plugin` specifier shape.
 - Backend selection has no such data source. The backend list and the
-  `-ggml-<backend>.so` filename convention are Assistant's guesses, and both
-  fail *silently* toward shipping too much. This is the debt the tech-debt note
-  exists to track.
-- Generating a file another package reads is weaker than passing it options.
-  The seam exists because the SDK Expo plugin accepts no props; if SDK ever
-  takes a `plugins` option, this generation step should collapse into it.
-- One more generated artifact in the project root for developers to recognise.
-- A YAML parser (`yaml`) joins Assistant's dependencies.
-- Assistant now appends generated code to a third-party file
-  (`react-native-bare-kit/android/link.mjs`). It already rewrote that file's
-  project root, so the seam is not new, but the appended block is larger and
-  the pruning is by filename convention (`-ggml-<backend>`). If an addon ever
-  names a backend library differently, the prune misses it — it fails toward
-  shipping too much, not too little.
-- Backend selection is a real capability decision. A CPU-only build is slower
-  on every device that had a usable GPU, and that trade-off is now one line of
-  YAML away from being made accidentally. The measured saving is large enough
-  that the temptation is real.
+  `-ggml-<backend>` filename convention are Assistant's guesses, applied by
+  appending generated code to `react-native-bare-kit/android/link.mjs`.
+  Assistant already rewrote that file's project root, so the seam is not new,
+  but the block is larger and the convention fails *silently* toward shipping
+  too much.
+- Generating a file another package reads is weaker than passing it options. If
+  SDK ever takes a `plugins` prop, this generation step should collapse into it.
+- One more generated artifact in the project root, and a YAML parser (`yaml`)
+  in Assistant's dependencies.
+- A CPU-only build is slower on every device that had a usable GPU, and that
+  trade-off is now one line of YAML away from being made accidentally. The
+  measured saving is large enough that the temptation is real.
+
+Every coupling above is inventoried, with its failure mode and the upstream
+change that would remove it, in
+[TD-PACKAGING-SELECTION-COUPLING](../tech-debt/TD-PACKAGING-SELECTION-COUPLING.md).
 
 ## Alternatives considered
 
@@ -193,6 +172,9 @@ why the choice is declared per app rather than optimised automatically.
 - **Call `bundleSdk` directly from Assistant instead of generating a file.**
   Rejected: it would fork SDK's bundling path and make Assistant responsible for
   verification, hosts, and deferred modules that SDK already owns.
+- **Assistant-invented capability names.** Rejected after review: it produced a
+  third vocabulary alongside SDK's canonical types and aliases, and cost one
+  Assistant edit per SDK plugin addition.
 - **JSON or TypeScript instead of YAML.** Rejected for the authored file: this
   is a hand-written declaration that wants comments. The generated file stays
   JSON because that is what SDK reads.
@@ -201,20 +183,19 @@ why the choice is declared per app rather than optimised automatically.
 
 Change this ADR to Accepted only after:
 
-1. The same selection drives an iOS build, not only Android — capability
-   selection already does; backend pruning does not (see above).
+1. The same selection drives an iOS build. Capability selection already does;
+   backend pruning does not.
 2. A device run confirms a completion-only, CPU-only build still completes a
-   real model run. A smaller binary that cannot infer proves nothing, and this
-   is the gate that matters most for `accelerators`: nothing here has yet shown
-   that a Vulkan-less build loads a model on a real device.
+   real model run. This is the gate that matters most for `accelerators`:
+   nothing here has yet shown that a Vulkan-less build loads a model on real
+   hardware, and a smaller binary that cannot infer proves nothing.
 
 Already met: `bun run test:pack` builds a clean Expo consumer from packed
-tarballs whose only QVAC configuration is a `qvac.assistant.yaml` declaring
-`capabilities: [completion]`, and asserts the generated SDK config, the recorded
-selection, and that `@qvac/llm-llamacpp` is the only inference addon reaching
-the linker. The propagation therefore survives package extraction and does not
-depend on the workspace layout. The Sync-only and Harness-only consumers in the
-same run confirm independent adoptability is unaffected.
+tarballs whose only QVAC configuration is a `qvac.assistant.yaml`, and asserts
+the generated SDK config, the recorded selection, the Android prune step, and
+that `@qvac/llm-llamacpp` is the only inference addon reaching the linker. The
+Sync-only and Harness-only consumers in the same run confirm independent
+adoptability is unaffected.
 
 ## Related material
 

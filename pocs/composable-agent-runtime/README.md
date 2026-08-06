@@ -89,12 +89,12 @@ Assistant generates a `qvac.config.json` from it for the SDK Expo plugin, which
 takes no props and reads only that file. The generated file is gitignored, and
 Assistant refuses to overwrite a `qvac.config.json` it did not write. What a
 build selected is recorded in `qvac/assistant-stack.manifest.json` under
-`sdkPluginSelection`. See
+`sdkPluginSelection` and `acceleratorSelection`. See
 [ADR 0005](docs/arch/adrs/0005-application-owned-assistant-config.md).
 
 Measured on `apps/task-mobile`, arm64-v8a release, with `bun run report:apk`:
 
-| | No config | `capabilities: [completion]` | `+ accelerators: [cpu]` |
+| | No config | `capabilities: [llm]` | `+ accelerators: [cpu]` |
 |---|---|---|---|
 | APK | 461.0 MB | 243.4 MB | 138.6 MB |
 | Native libraries | 424.8 MB / 72 files | 210.3 MB / 50 files | 105.5 MB / 48 files |
