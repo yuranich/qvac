@@ -1,0 +1,34 @@
+# QVAC Assistant configuration.
+#
+# This is the only QVAC config file an application writes. @qvac/assistant
+# resolves it during `expo prebuild` and propagates it to the packages it
+# composes, so the build produces only what this app declares.
+version: 1
+
+logging:
+  level: info
+
+inference:
+  # Capabilities this app can run. Everything not listed is left out of the
+  # worker bundle, and its native prebuilds are never linked into the binary.
+  #
+  # Names come from the installed @qvac/sdk, not from a list Assistant keeps:
+  # either a canonical model type (`llamacpp-completion`, `ggml-ocr`, ...) or
+  # one of SDK's own aliases (`llm`, `ocr`, `diffusion`, ...). A third-party
+  # plugin is named by its specifier, as in `my-plugin/plugin`.
+  #
+  # Remove this section entirely to keep every built-in capability.
+  capabilities:
+    - llm
+
+  # GPU backends to ship. Each addon publishes one prebuilt library per
+  # backend and ggml picks among them at runtime from device capability, so
+  # this is a product choice, not an optimisation: dropping vulkan means this
+  # app runs on the CPU even on a device that has a Vulkan driver.
+  #
+  # Available: vulkan, opencl, metal. ggml's CPU backend is its base and is
+  # always linked, so `[cpu]` below means "CPU only".
+  #
+  # Remove this list entirely to keep every backend the addons ship.
+  accelerators:
+    - cpu

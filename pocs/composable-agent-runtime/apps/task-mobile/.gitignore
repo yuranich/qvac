@@ -1,5 +1,7 @@
 .expo/
 qvac/
+# Generated from qvac.assistant.yaml by @qvac/assistant/expo-plugin.
+qvac.config.json
 generated/*.bundle
 generated/*.js
 generated/build-measurements.json

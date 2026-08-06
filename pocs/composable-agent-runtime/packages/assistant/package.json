@@ -22,7 +22,7 @@
     "examples/**/*.ts"
   ],
   "scripts": {
-    "build:expo-plugin": "bun build expo-plugin.ts --target=node --format=esm --outfile=dist/expo-plugin.js --external=@expo/config-plugins --external=@expo/config-types --external=@qvac/sdk --external=@qvac/sync --external=@qvac/harness --external=bare-bundle --external=react-native-bare-kit",
+    "build:expo-plugin": "bun build expo-plugin.ts --target=node --format=esm --outfile=dist/expo-plugin.js --external=@expo/config-plugins --external=@expo/config-types --external=@qvac/sdk --external=@qvac/sync --external=@qvac/harness --external=bare-bundle --external=react-native-bare-kit --external=yaml",
     "inbox": "bun examples/assistant-inbox.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -34,7 +34,8 @@
     "@qvac/logging": "^0.1.0",
     "@qvac/supervisor": "0.0.0-poc",
     "@qvac/sync": "0.0.0-poc",
-    "bare-bundle": "^1.10.0"
+    "bare-bundle": "^1.10.0",
+    "yaml": "^2.9.0"
   },
   "peerDependencies": {
     "@expo/config-plugins": "^54.0.4",

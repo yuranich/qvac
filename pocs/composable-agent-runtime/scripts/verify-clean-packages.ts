@@ -253,6 +253,12 @@ async function verifyMobileConsumer(
       2
     )}\n`
   )
+  if (consumer.name === 'assistant-fullstack') {
+    await writeFile(
+      join(directory, 'qvac.assistant.yaml'),
+      'version: 1\ninference:\n  capabilities:\n    - llm\n  accelerators:\n    - cpu\n'
+    )
+  }
   await writeFile(
     join(directory, 'index.ts'),
     "import { registerRootComponent } from 'expo'\nimport App from './App'\nregisterRootComponent(App)\n"
@@ -293,19 +299,117 @@ async function verifyMobileConsumer(
     })
     const stackManifest = JSON.parse(
       await readFile(join(directory, 'qvac/assistant-stack.manifest.json'), 'utf8')
-    ) as { pluginExecutionOrder?: unknown }
+    ) as {
+      pluginExecutionOrder?: unknown
+      sdkPluginSelection?: unknown
+      acceleratorSelection?: unknown
+    }
     if (
       !Array.isArray(stackManifest.pluginExecutionOrder) ||
       stackManifest.pluginExecutionOrder.join(',') !==
-        'sync-contributor-plugin,harness-contributor-plugin,invoke-sdk-expo-plugin,finalize-assistant-stack'
+        'resolve-assistant-app-config,sync-contributor-plugin,harness-contributor-plugin,invoke-sdk-expo-plugin,finalize-assistant-stack'
     ) {
       throw new Error(
         `unexpected assistant pluginExecutionOrder: ${JSON.stringify(stackManifest.pluginExecutionOrder)}`
       )
     }
+    await assertCapabilitySelectionPropagated(directory, stackManifest.sdkPluginSelection)
+    await assertAcceleratorSelectionPropagated(directory, stackManifest.acceleratorSelection)
   }
   // Drop each Expo tree before the next consumer so disk pressure stays bounded.
   await rm(directory, { recursive: true, force: true })
+}
+
+/**
+ * The consumer declared `capabilities: [llm]` in qvac.assistant.yaml, which
+ * Everything below is what that one line must produce from a packed tarball:
+ * the generated SDK config, one plugin in the worker bundle, and exactly one
+ * inference addon reaching the linker.
+ */
+async function assertCapabilitySelectionPropagated(
+  projectRoot: string,
+  selection: unknown
+) {
+  const expectedPlugins = ['@qvac/sdk/llamacpp-completion/plugin']
+  const recorded = selection as
+    | { capabilities?: unknown; plugins?: unknown }
+    | null
+    | undefined
+  if (
+    !recorded ||
+    !Array.isArray(recorded.capabilities) ||
+    recorded.capabilities.join(',') !== 'llamacpp-completion' ||
+    !Array.isArray(recorded.plugins) ||
+    recorded.plugins.join(',') !== expectedPlugins.join(',')
+  ) {
+    throw new Error(
+      `assistant stack manifest did not record the capability selection: ${JSON.stringify(selection)}`
+    )
+  }
+
+  const generated = JSON.parse(
+    await readFile(join(projectRoot, 'qvac.config.json'), 'utf8')
+  ) as { plugins?: unknown }
+  if (
+    !Array.isArray(generated.plugins) ||
+    generated.plugins.join(',') !== expectedPlugins.join(',')
+  ) {
+    throw new Error(
+      `generated qvac.config.json did not select the declared plugins: ${JSON.stringify(generated.plugins)}`
+    )
+  }
+
+  const addonsManifest = JSON.parse(
+    await readFile(join(projectRoot, 'qvac/addons.manifest.json'), 'utf8')
+  ) as { addons?: unknown }
+  if (!Array.isArray(addonsManifest.addons)) {
+    throw new Error('addons manifest has no addon list')
+  }
+  const inferenceAddons = addonsManifest.addons.filter(
+    (name): name is string => typeof name === 'string' && name.startsWith('@qvac/')
+  )
+  if (inferenceAddons.join(',') !== '@qvac/llm-llamacpp') {
+    throw new Error(
+      `capability selection did not reach the linker; inference addons: ${JSON.stringify(inferenceAddons)}`
+    )
+  }
+}
+
+/**
+ * The consumer declared `accelerators: [cpu]`. That must be recorded and must
+ * reach the Android linker as a prune step, while the iOS linker stays
+ * untouched — Apple ships signed frameworks that this does not attempt to
+ * rewrite.
+ */
+async function assertAcceleratorSelectionPropagated(
+  projectRoot: string,
+  selection: unknown
+) {
+  const recorded = selection as { accelerators?: unknown } | null | undefined
+  if (
+    !recorded ||
+    !Array.isArray(recorded.accelerators) ||
+    recorded.accelerators.join(',') !== 'cpu'
+  ) {
+    throw new Error(
+      `assistant stack manifest did not record the accelerator selection: ${JSON.stringify(selection)}`
+    )
+  }
+
+  const bareKitRoot = join(projectRoot, 'node_modules', 'react-native-bare-kit')
+  const androidLinker = await readFile(join(bareKitRoot, 'android', 'link.mjs'), 'utf8')
+  if (!androidLinker.includes('pruneUndeclaredAccelerators')) {
+    throw new Error('android linker is missing the declared accelerator prune step')
+  }
+  for (const backend of ['vulkan', 'opencl', 'metal']) {
+    if (!androidLinker.includes(`"${backend}"`)) {
+      throw new Error(`android linker prune step does not remove ${backend}`)
+    }
+  }
+  const iosLinker = await readFile(join(bareKitRoot, 'ios', 'link.mjs'), 'utf8')
+  if (iosLinker.includes('pruneUndeclaredAccelerators')) {
+    throw new Error('ios linker must not carry the android-only accelerator prune step')
+  }
 }
 
 async function assertManifestAwareBareKitLinkers(projectRoot: string) {

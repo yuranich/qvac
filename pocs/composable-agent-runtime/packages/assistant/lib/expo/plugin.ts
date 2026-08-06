@@ -7,12 +7,15 @@ import {
   type ExportedConfigWithProps
 } from '@expo/config-plugins'
 import type { ExpoConfig } from '@expo/config-types'
+import path from 'node:path'
 import { createHarnessExpoPlugin } from '@qvac/harness/expo-plugin'
 import sdkExpoPlugin from '@qvac/sdk/expo-plugin'
 import { createSyncExpoPlugin } from '@qvac/sync/expo-plugin'
 import { readAssistantPackageVersion } from '../packaging/addon-inventory.ts'
+import { resolveAssistantAppConfig, writeGeneratedSdkConfig } from './app-config.ts'
 import { finalizeAssistantStack } from './finalize.ts'
 import {
+  ASSISTANT_APP_CONFIG_RUN_ONCE,
   ASSISTANT_FINALIZE_RUN_ONCE,
   ASSISTANT_PLUGIN_ID,
   HARNESS_PLUGIN_ID,
@@ -49,6 +52,7 @@ export function createAssistantExpoPlugin(
       build: options.harnessBuild as never
     })
   const finalizeCache = new Map<string, Promise<void>>()
+  const appConfigCache = new Map<string, Promise<void>>()
   const runOncePlugin = createRunOncePlugin(
     withAssistantExpoPlugin,
     ASSISTANT_PLUGIN_ID,
@@ -66,13 +70,40 @@ export function createAssistantExpoPlugin(
       assistantPlugin: withAssistantExpoPlugin
     })
     // Expo dangerous mods execute in reverse registration order. Register finalizer
-    // first and Sync last so actual execution is sync -> harness -> SDK -> finalizer.
+    // first and the app-config resolver last so actual execution is
+    // app-config -> sync -> harness -> SDK -> finalizer. The SDK plugin reads the
+    // generated qvac.config.json off disk, so it must be written before SDK runs.
     return withPlugins(config, [
       withRunOnceFinalizePlugin,
       sdkPlugin,
       harnessPlugin,
-      syncPlugin
+      syncPlugin,
+      withRunOnceAppConfigPlugin
     ])
+  }
+
+  function withRunOnceAppConfigPlugin(config: ExpoConfig) {
+    return withRunOnce(config, {
+      name: ASSISTANT_APP_CONFIG_RUN_ONCE,
+      version: ASSISTANT_PLUGIN_VERSION,
+      plugin(configValue) {
+        configValue = withDangerousMod(configValue, [
+          'android',
+          async (context) => {
+            await resolveAppConfigOnce(context)
+            return context
+          }
+        ])
+        configValue = withDangerousMod(configValue, [
+          'ios',
+          async (context) => {
+            await resolveAppConfigOnce(context)
+            return context
+          }
+        ])
+        return configValue
+      }
+    })
   }
 
   function withRunOnceFinalizePlugin(config: ExpoConfig) {
@@ -99,6 +130,18 @@ export function createAssistantExpoPlugin(
     })
   }
 
+  async function resolveAppConfigOnce(context: ExportedConfigWithProps<unknown>) {
+    const projectRoot = readProjectRoot(context)
+    const existing = appConfigCache.get(projectRoot)
+    if (existing) return existing
+    const work = propagateAppConfig(projectRoot).catch((error: unknown) => {
+      appConfigCache.delete(projectRoot)
+      throw error
+    })
+    appConfigCache.set(projectRoot, work)
+    return work
+  }
+
   async function finalizeOnce(context: ExportedConfigWithProps<unknown>) {
     const projectRoot = readProjectRoot(context)
     const existing = finalizeCache.get(projectRoot)
@@ -112,6 +155,25 @@ export function createAssistantExpoPlugin(
     finalizeCache.set(projectRoot, work)
     return work
   }
+}
+
+export async function propagateAppConfig(projectRoot: string) {
+  const resolved = await resolveAssistantAppConfig(projectRoot)
+  if (resolved === null) {
+    console.log(
+      '▸ QVAC assistant: no qvac.assistant.yaml, keeping every built-in SDK capability'
+    )
+    return
+  }
+  const generatedPath = await writeGeneratedSdkConfig(projectRoot, resolved)
+  const selection =
+    resolved.capabilities === null
+      ? 'every built-in capability'
+      : `capabilities ${resolved.capabilities.join(', ')}`
+  console.log(
+    `▸ QVAC assistant: ${path.basename(resolved.configPath)} selected ${selection}; ` +
+      `wrote ${path.basename(generatedPath)}`
+  )
 }
 
 function readProjectRoot(context: ExportedConfigWithProps<unknown>) {
