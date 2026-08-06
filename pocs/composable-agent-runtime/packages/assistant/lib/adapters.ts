@@ -1,5 +1,6 @@
 import {
   createHarness,
+  type CreateHarnessOptions,
   type HarnessRuntime
 } from '@qvac/harness'
 import {
@@ -36,15 +37,31 @@ export async function startSyncComponent(
   }
 }
 
+export interface StartHarnessOptions {
+  readonly inference: AssistantInference
+  readonly logging?: CreateAssistantOptions['logging']
+  readonly workers?: CreateAssistantOptions['workers']
+  readonly host?: CreateAssistantOptions['host']
+  /** Overridden by tests so forwarding can be asserted without a Bare worker. */
+  readonly createHarness?: (options: CreateHarnessOptions) => HarnessRuntime
+}
+
 export async function startHarnessComponent(
   state: AssistantSyncComponent['state'],
-  inference: AssistantInference,
-  logging?: CreateAssistantOptions['logging']
+  {
+    inference,
+    logging,
+    workers,
+    host,
+    createHarness: create = createHarness
+  }: StartHarnessOptions
 ): Promise<AssistantHarnessComponent> {
-  const harness: HarnessRuntime = createHarness({
+  const harness: HarnessRuntime = create({
     state,
     inference: inference.kind,
-    logging
+    logging,
+    ...(workers ? { workers } : {}),
+    ...(host ? { host } : {})
   })
   try {
     await harness.ready()

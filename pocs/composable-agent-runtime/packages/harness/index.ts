@@ -15,6 +15,11 @@ export {
   harnessCompatibility,
   type HarnessRuntimeHandshake
 } from './lib/runtime/compatibility.ts'
+/**
+ * Already reachable through `CreateHarnessOptions['host']`; named here so a
+ * composing host can declare it without importing the skill-authoring kit.
+ */
+export type { HarnessHostConfig } from './lib/runtime/host-config.ts'
 export type {
   DurableStatePort,
   DurableStateInput,
