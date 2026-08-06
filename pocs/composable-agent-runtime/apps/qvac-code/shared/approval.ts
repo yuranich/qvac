@@ -27,14 +27,34 @@ export function formatApprovalGateId(input: {
   return `approval/${executorId}/${input.index}`
 }
 
+/**
+ * `resolve-gate` is create-only: the first decision written to a gate is
+ * permanent for every peer. So a decision token that cannot be parsed back
+ * does not merely lose information -- it jams that gate forever, and
+ * `resolveApprovalGate` then reports `unreachable` on a gate that in fact
+ * resolved. The decider ref is therefore the *last* field and may contain the
+ * delimiter: a peer's device ref is not ours to constrain, and a base64 device
+ * key contains `/` routinely.
+ */
 export function formatApprovalDecision(decision: CodeApprovalDecision): string {
-  return `${decision.verdict}/${decision.decidedBy.kind}/${deciderToken(decision.decidedBy)}`
+  const decider = deciderToken(decision.decidedBy)
+  if (!decider.trim()) {
+    throw new Error(
+      `Approval decision needs a decider reference: ${decision.decidedBy.kind}`
+    )
+  }
+  return `${decision.verdict}/${decision.decidedBy.kind}/${decider}`
 }
 
 export function parseApprovalDecision(token: string): CodeApprovalDecision | null {
-  const parts = token.split('/')
-  if (parts.length !== 3) return null
-  const [verdict, kind, id] = parts
+  const firstBreak = token.indexOf('/')
+  if (firstBreak <= 0) return null
+  const secondBreak = token.indexOf('/', firstBreak + 1)
+  if (secondBreak <= firstBreak + 1) return null
+  const verdict = token.slice(0, firstBreak)
+  const kind = token.slice(firstBreak + 1, secondBreak)
+  // Deliberately the remainder, not a third split field: see above.
+  const id = token.slice(secondBreak + 1)
   if (!isVerdict(verdict)) return null
   const decidedBy = deciderFromToken(kind, id)
   if (decidedBy == null) return null

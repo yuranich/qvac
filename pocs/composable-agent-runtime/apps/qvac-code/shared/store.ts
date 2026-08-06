@@ -44,6 +44,14 @@ export type CodeGateResolution =
 
 export type CodeFinishOutcome = { readonly kind: 'recorded' } | { readonly kind: 'superseded' }
 
+/**
+ * `created` means the stored payload is the one we sent. `superseded` means a
+ * concurrent writer's row won that workId. `unconfirmed` means the row was not
+ * readable back yet, which is not a failure -- the caller decides whether to
+ * retry at a fresh sequence number.
+ */
+export type CodeCreateKind = 'created' | 'superseded' | 'unconfirmed'
+
 export interface CodeMeshStore {
   createSession(input: {
     readonly sessionId: string
@@ -51,14 +59,14 @@ export interface CodeMeshStore {
     readonly projectLabel: string
     readonly model: string
     readonly createdBy: string
-  }): Promise<{ readonly workId: string }>
+  }): Promise<{ readonly workId: string; readonly kind: CodeCreateKind }>
   createTurn(input: {
     readonly sessionId: string
     readonly seq: number
     readonly prompt: string
     readonly requestedBy: string
     readonly target?: string
-  }): Promise<{ readonly turnWorkId: string }>
+  }): Promise<{ readonly turnWorkId: string; readonly kind: CodeCreateKind }>
   nextTurnSeq(sessionId: string): Promise<number>
   listSessions(): Promise<readonly CodeWorkRecord[]>
   getWork(workId: string): Promise<CodeWorkRecord | null>
@@ -127,14 +135,16 @@ export function createCodeMeshStore(state: { readonly work: Profile }): CodeMesh
   return {
     async createSession(input) {
       const { command, operationId } = createSessionCommand(input)
+      const workId = formatSessionWorkId(input.sessionId)
       await profile.apply(command, { operationId })
-      return { workId: formatSessionWorkId(input.sessionId) }
+      return { workId, kind: await confirmCreate(profile, workId, command) }
     },
 
     async createTurn(input) {
       const { command, operationId } = createTurnCommand(input)
+      const turnWorkId = formatTurnWorkId(input)
       await profile.apply(command, { operationId })
-      return { turnWorkId: formatTurnWorkId(input) }
+      return { turnWorkId, kind: await confirmCreate(profile, turnWorkId, command) }
     },
 
     async nextTurnSeq(sessionId) {
@@ -181,10 +191,7 @@ export function createCodeMeshStore(state: { readonly work: Profile }): CodeMesh
 
     async listOpenGates() {
       const result = await profile.query({ type: 'list-open-gates' })
-      // list-open-gates is mesh-wide (bounded by open-gate count, not
-      // history, per the durable-work contract), so narrow it to this app's
-      // `code/` namespace before handing rows to a caller.
-      return result.gates.filter((gate) => parseCodeWorkId(gate.workId) != null)
+      return ownGates(profile, result.gates)
     },
 
     async openClaimGate(input) {
@@ -255,12 +262,16 @@ export function createCodeMeshStore(state: { readonly work: Profile }): CodeMesh
       try {
         await profile.apply(command, { operationId })
       } catch (error) {
-        // request-cancel's operationId is keyed only on workId, so a second
-        // cancel with a different reason string collides on bytes and
-        // throws. Re-read the row: if cancellation is already recorded, the
-        // intent is satisfied regardless of whose reason text won the race.
+        // The reducer shares one branch between request-cancel and
+        // record-outcome, and rejects a cancel when the row is already
+        // terminal as well as when it is already cancelled. Both mean the
+        // intent -- stop this turn -- is satisfied: a turn that finished a
+        // moment before the cancel arrived is the common case when a phone
+        // cancels a streaming turn, and it must not surface as a failure.
+        // A second cancel with different reason text also lands here, because
+        // the operationId is keyed on the workId alone.
         const work = await readWork(profile, input.workId)
-        if (work?.cancelRequested) return
+        if (work?.cancelRequested || work?.outcomeStatus != null) return
         throw new Error(`Request cancel failed for ${input.workId}`, { cause: toError(error) })
       }
     },
@@ -322,7 +333,7 @@ export function createCodeMeshStore(state: { readonly work: Profile }): CodeMesh
         { type: 'list-open-gates' },
         async () => {
           const result = await profile.query({ type: 'list-open-gates' })
-          return result.gates.filter((gate) => parseCodeWorkId(gate.workId) != null)
+          return ownGates(profile, result.gates)
         },
         options
       )
@@ -335,9 +346,61 @@ async function listSessionsRaw(profile: Profile) {
   return result.works.filter((work) => work.payloadFormat === CODE_SESSION_FORMAT)
 }
 
+/**
+ * `record-work` is create-only, and Sync's operationId dedup drops a duplicate
+ * operation during merge replay *without* comparing content. Two devices that
+ * both computed the same next seq therefore both see their own `apply` succeed
+ * locally, and only one payload survives linearization -- so a caller told
+ * nothing but "ok" cannot know whose prompt is actually stored. Read the row
+ * back and compare the payload we sent.
+ */
+async function confirmCreate(
+  profile: Profile,
+  workId: string,
+  command: DurableWorkCommand
+): Promise<CodeCreateKind> {
+  if (command.type !== 'record-work') {
+    throw new Error(`confirmCreate expects record-work, got ${command.type}`)
+  }
+  const work = await readWork(profile, workId)
+  if (!work) return 'unconfirmed'
+  return sameBytes(work.payload, command.payload) ? 'created' : 'superseded'
+}
+
+function sameBytes(left: Buffer | Uint8Array, right: Buffer | Uint8Array) {
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index++) {
+    if (left[index] !== right[index]) return false
+  }
+  return true
+}
+
 async function readWork(profile: Profile, workId: string) {
   const result = await profile.query({ type: 'get-work', workId })
   return result.work ?? null
+}
+
+/**
+ * `list-open-gates` is mesh-wide, and `open-gate` only requires that some work
+ * row exists at the id -- it never checks that row's format. A workId shaped
+ * like ours is therefore not proof the gate is ours: another profile consumer
+ * could hold a row at a colliding id. Confirm the owning row's payloadFormat,
+ * the same filter every other read here applies. Cheap because the open-gate
+ * set is bounded by outstanding decisions, normally none or one.
+ */
+async function ownGates(profile: Profile, gates: CodeGateRecord[]) {
+  const candidates = gates.filter((gate) => parseCodeWorkId(gate.workId) != null)
+  if (candidates.length === 0) return candidates
+  const owners = new Map<string, boolean>()
+  for (const workId of new Set(candidates.map((gate) => gate.workId))) {
+    const work = await readWork(profile, workId)
+    owners.set(
+      workId,
+      work?.payloadFormat === CODE_TURN_FORMAT ||
+        work?.payloadFormat === CODE_SESSION_FORMAT
+    )
+  }
+  return candidates.filter((gate) => owners.get(gate.workId) === true)
 }
 
 async function readGate(profile: Profile, workId: string, gateId: string) {

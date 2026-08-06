@@ -43,11 +43,37 @@ describe('approval decision tokens', function () {
     expect(parseApprovalDecision('')).toBeNull()
     expect(parseApprovalDecision('approved')).toBeNull()
     expect(parseApprovalDecision('approved/executor')).toBeNull()
-    expect(parseApprovalDecision('approved/executor/e1/extra')).toBeNull()
     expect(parseApprovalDecision('not-a-verdict/executor/e1')).toBeNull()
     expect(parseApprovalDecision('approved/not-a-kind/e1')).toBeNull()
     expect(parseApprovalDecision('approved/policy/not-a-rule')).toBeNull()
     expect(parseApprovalDecision('approved/executor/')).toBeNull()
+    expect(parseApprovalDecision('/executor/e1')).toBeNull()
+  })
+
+  /**
+   * resolve-gate is create-only, so a decision that cannot be parsed back is
+   * not a lost field -- it jams that gate permanently and makes
+   * resolveApprovalGate report `unreachable` on a gate that did resolve. A
+   * peer's device ref is not ours to constrain and a base64 device key
+   * contains '/' routinely, so the ref is the remainder of the token.
+   */
+  test('round-trips a decider reference containing the delimiter', function () {
+    const decision = {
+      verdict: 'approved' as const,
+      decidedBy: { kind: 'peer' as const, deviceRef: 'zY3+k/9w==' }
+    }
+    const token = formatApprovalDecision(decision)
+    expect(token).toBe('approved/peer/zY3+k/9w==')
+    expect(parseApprovalDecision(token)).toEqual(decision)
+  })
+
+  test('refuses to mint a token with an empty decider reference', function () {
+    expect(() =>
+      formatApprovalDecision({
+        verdict: 'approved',
+        decidedBy: { kind: 'peer', deviceRef: '' }
+      })
+    ).toThrow(/needs a decider reference/)
   })
 })
 

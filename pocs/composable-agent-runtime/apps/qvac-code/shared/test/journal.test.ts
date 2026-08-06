@@ -126,3 +126,67 @@ describe('journal bodies', function () {
     expect(decodeJournalBody(encodeJournalBody(body))).toEqual(body)
   })
 })
+
+/**
+ * Journal bodies arrive from any writer admitted to the mesh, so the fields
+ * that name an executor get the same grammar the gate-decision tokens use, and
+ * an oversized body is rejected before it is parsed -- every watching peer
+ * decodes every entry on every wake, so one writer must not set that cost.
+ */
+describe('journal bodies are validated against untrusted writers', function () {
+  const valid = { writer: 'code-host-hash', seq: 1 }
+
+  test('rejects a writer that is not a well-formed executor id', function () {
+    const bytes = encodeJsonBytes({
+      writer: 'code/host/hash',
+      seq: 1,
+      type: 'assistant-delta',
+      text: 'hi'
+    })
+    expect(decodeJournalBody(bytes)).toBeNull()
+  })
+
+  test('rejects an oversized executor id rather than holding it in memory', function () {
+    const bytes = encodeJsonBytes({
+      ...valid,
+      type: 'turn-superseded',
+      executorId: 'a'.repeat(500),
+      winner: 'code-other-hash'
+    })
+    expect(decodeJournalBody(bytes)).toBeNull()
+  })
+
+  test('rejects a winner that is not a well-formed executor id', function () {
+    const bytes = encodeJsonBytes({
+      ...valid,
+      type: 'turn-superseded',
+      executorId: 'code-host-hash',
+      winner: 'code/other/hash'
+    })
+    expect(decodeJournalBody(bytes)).toBeNull()
+  })
+
+  test('rejects a body larger than the per-entry ceiling', function () {
+    const bytes = encodeJsonBytes({
+      ...valid,
+      type: 'assistant-delta',
+      text: 'x'.repeat(70 * 1024)
+    })
+    expect(decodeJournalBody(bytes)).toBeNull()
+  })
+
+  test('still accepts a body at a normal delta size', function () {
+    const bytes = encodeJsonBytes({
+      ...valid,
+      type: 'assistant-delta',
+      text: 'x'.repeat(1024)
+    })
+    expect(decodeJournalBody(bytes)).not.toBeNull()
+  })
+
+  test('returns null for valid JSON that is not an object', function () {
+    for (const value of [[], 42, 'x', true, null]) {
+      expect(decodeJournalBody(encodeJsonBytes(value))).toBeNull()
+    }
+  })
+})

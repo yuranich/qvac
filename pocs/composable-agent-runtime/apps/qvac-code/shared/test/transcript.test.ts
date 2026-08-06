@@ -342,7 +342,14 @@ describe('projectTurn: status', function () {
     expect(view.status).toBe('cancelled')
   })
 
-  test('superseded when a turn-superseded entry exists from the surviving writer', function () {
+  /**
+   * `append-journal` neither checks that the caller won the claim nor stamps an
+   * authenticated writer, and the row has no column to stamp one into, so
+   * `writer` is self-declared. If a terminal status could be derived from it,
+   * any admitted peer could retire a live turn on every other device's screen.
+   * Status therefore comes only from the work row and the CAS-arbitrated gate.
+   */
+  test('a turn-superseded entry does not retire a turn the claim still owns', function () {
     const view = projectTurn({
       work: work(),
       entries: [
@@ -350,7 +357,19 @@ describe('projectTurn: status', function () {
       ],
       gates: [claimGate(formatClaimDecision(WINNER))]
     })
-    expect(view.status).toBe('superseded')
+    expect(view.status).toBe('running')
+  })
+
+  test('a forged entry attributed to the winner cannot fabricate an outcome', function () {
+    const view = projectTurn({
+      work: work(),
+      entries: [
+        entry({ writer: WINNER, seq: 1, type: 'turn-interrupted', executorId: WINNER })
+      ],
+      gates: [claimGate(formatClaimDecision(WINNER))]
+    })
+    expect(view.status).toBe('running')
+    expect(view.finalText).toBeNull()
   })
 })
 

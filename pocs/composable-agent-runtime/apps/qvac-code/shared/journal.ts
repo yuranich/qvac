@@ -1,6 +1,14 @@
 import { CODE_ENTRY } from './formats.ts'
 import { decodeJsonBytes, encodeJsonBytes } from './codec.ts'
+import { isExecutorId } from './ids.ts'
 import type { CodeApprovalDecision, CodeDeciderRef } from './approval.ts'
+
+/**
+ * One journal entry's ceiling. A delta flush is bounded by the batcher's byte
+ * threshold, and tool summaries are short, so anything past this is either a
+ * bug or a peer trying to make every other device pay for its write.
+ */
+const MAX_JOURNAL_BODY_BYTES = 64 * 1024
 
 export interface CodeJournalHeader {
   readonly writer: string
@@ -78,6 +86,11 @@ export function encodeJournalBody(body: CodeJournalBody): Buffer {
  * failing the whole transcript render.
  */
 export function decodeJournalBody(bytes: Buffer): CodeJournalBody | null {
+  // Any admitted writer can append to a turn journal -- the reducer only
+  // checks that the work row exists -- and every watching peer decodes every
+  // entry on every wake. Reject an oversized body before parsing it rather
+  // than letting one writer set the cost for the whole mesh.
+  if (bytes.length > MAX_JOURNAL_BODY_BYTES) return null
   let value: unknown
   try {
     value = decodeJsonBytes(bytes)
@@ -91,7 +104,7 @@ export function decodeJournalBody(bytes: Buffer): CodeJournalBody | null {
   if (type === 'turn-claim') {
     const executorId = Reflect.get(value, 'executorId')
     const result = Reflect.get(value, 'result')
-    if (typeof executorId !== 'string' || !executorId.trim()) return null
+    if (typeof executorId !== 'string' || !isExecutorId(executorId)) return null
     if (result !== 'won' && result !== 'confirmed' && result !== 'lost') return null
     return { ...header, type, executorId, result }
   }
@@ -154,25 +167,32 @@ export function decodeJournalBody(bytes: Buffer): CodeJournalBody | null {
   }
   if (type === 'turn-interrupted') {
     const executorId = Reflect.get(value, 'executorId')
-    if (typeof executorId !== 'string' || !executorId.trim()) return null
+    if (typeof executorId !== 'string' || !isExecutorId(executorId)) return null
     return { ...header, type, executorId }
   }
   if (type === 'turn-superseded') {
     const executorId = Reflect.get(value, 'executorId')
     const winner = Reflect.get(value, 'winner')
-    if (typeof executorId !== 'string' || !executorId.trim()) return null
-    if (typeof winner !== 'string' || !winner.trim()) return null
+    if (typeof executorId !== 'string' || !isExecutorId(executorId)) return null
+    if (typeof winner !== 'string' || !isExecutorId(winner)) return null
     return { ...header, type, executorId, winner }
   }
   // Unrecognised type: forward-compatibility path described above.
   return null
 }
 
+/**
+ * `writer` must be a well-formed executor id, which also means only executors
+ * author journal entries. That holds by design: a peer's contribution to a turn
+ * is resolving a gate, never appending to the transcript. The value is still
+ * self-declared and unauthenticated, so it is used for grouping and display and
+ * never as authority -- see `deriveStatus` in transcript.ts.
+ */
 function readHeader(value: unknown): CodeJournalHeader | null {
   if (typeof value !== 'object' || value === null) return null
   const writer = Reflect.get(value, 'writer')
   const seq = Reflect.get(value, 'seq')
-  if (typeof writer !== 'string' || !writer.trim()) return null
+  if (typeof writer !== 'string' || !isExecutorId(writer)) return null
   if (typeof seq !== 'number' || !Number.isSafeInteger(seq) || seq < 0) return null
   return { writer, seq }
 }

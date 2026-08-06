@@ -24,6 +24,9 @@ export function decodeUtf8Text(bytes: Buffer): string {
  */
 function decodeUtf8(bytes: Buffer | Uint8Array | string) {
   if (typeof bytes === 'string') return bytes
+  // Already a Buffer on Bare and Node, which is the path every local decode
+  // takes; Buffer.from would copy it again for nothing.
+  if (Buffer.isBuffer(bytes)) return bytes.toString('utf8')
   // Buffer.from normalises a plain Uint8Array into a Buffer whose toString
   // decodes text. TextDecoder is not available on Hermes.
   return Buffer.from(

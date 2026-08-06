@@ -30,12 +30,17 @@ export interface DeltaBatcher {
 export function createDeltaBatcher(policy?: Partial<DeltaBatcherPolicy>): DeltaBatcher {
   const resolved: DeltaBatcherPolicy = { ...DEFAULT_POLICY, ...policy }
   let buffer = ''
+  // Tracked incrementally rather than recomputed: push() runs once per
+  // streaming token, and re-measuring the whole accumulated buffer each time
+  // makes filling one window cost O(window^2) in scanned bytes.
+  let bufferBytes = 0
   let firstBufferedAt: number | null = null
   let emittedEntries = 0
   let truncated = false
 
   function resetBuffer() {
     buffer = ''
+    bufferBytes = 0
     firstBufferedAt = null
   }
 
@@ -66,11 +71,11 @@ export function createDeltaBatcher(policy?: Partial<DeltaBatcherPolicy>): DeltaB
       if (text) {
         if (buffer === '') firstBufferedAt = now
         buffer += text
+        bufferBytes += Buffer.byteLength(text, 'utf8')
       }
       if (buffer === '') return { kind: 'buffer' }
-      const byteLength = Buffer.byteLength(buffer, 'utf8')
       const elapsed = firstBufferedAt == null ? 0 : now - firstBufferedAt
-      if (byteLength >= resolved.maxBytes || elapsed >= resolved.maxDelayMs) {
+      if (bufferBytes >= resolved.maxBytes || elapsed >= resolved.maxDelayMs) {
         return flushAction()
       }
       return { kind: 'buffer' }

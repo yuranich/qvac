@@ -269,6 +269,66 @@ describe('requestCancel is satisfied by an already-cancelled row', () => {
       harness.store.requestCancel({ workId: TURN, reason: 'stop' })
     ).rejects.toThrow(/Request cancel failed/)
   })
+
+  /**
+   * The reducer shares one branch between request-cancel and record-outcome and
+   * rejects a cancel once the row is terminal. A phone cancelling a turn that
+   * finished a moment earlier is the common case in the demo, and the intent --
+   * stop this turn -- is satisfied either way.
+   */
+  it('returns quietly when the turn already finished', async () => {
+    const harness = store({
+      applyThrows: true,
+      works: [workRow({ outcomeStatus: 'completed' })]
+    })
+    await harness.store.requestCancel({ workId: TURN, reason: 'too late' })
+  })
+})
+
+/**
+ * Sync drops a duplicate operationId during merge replay without comparing
+ * content, so both racing devices see their own apply succeed locally and only
+ * one payload survives. A caller told nothing but "ok" cannot know whose prompt
+ * is stored.
+ */
+describe('createTurn confirms whose payload actually landed', () => {
+  it('reports created when the stored payload is ours', async () => {
+    const harness = store()
+    const created = await harness.store.createTurn({
+      sessionId: SESSION,
+      seq: SEQ,
+      prompt: 'mine',
+      requestedBy: 'phone'
+    })
+    // The fake records the apply but stores nothing, so confirm reads back null.
+    expect(created.turnWorkId).toBe(TURN)
+    expect(created.kind).toBe('unconfirmed')
+  })
+
+  it('reports superseded when another writer won the work id', async () => {
+    const harness = store({
+      works: [
+        workRow({
+          payload: Buffer.from(
+            JSON.stringify({
+              kind: 'code-turn',
+              sessionId: SESSION,
+              seq: SEQ,
+              prompt: 'theirs',
+              requestedBy: 'other-phone'
+            })
+          )
+        })
+      ]
+    })
+    const created = await harness.store.createTurn({
+      sessionId: SESSION,
+      seq: SEQ,
+      prompt: 'mine',
+      requestedBy: 'phone'
+    })
+    expect(created.kind).toBe('superseded')
+  })
 })
 
 describe('queries stay inside this application', () => {
@@ -285,6 +345,7 @@ describe('queries stay inside this application', () => {
 
   it('ignores gates outside the code namespace', async () => {
     const harness = store({
+      works: [workRow()],
       gates: [
         gateRow({ id: 'x:g', workId: 'someone-else/1', gateId: 'g' }),
         gateRow({ gateId: 'approval/x/1' })
@@ -292,6 +353,24 @@ describe('queries stay inside this application', () => {
     })
     const open = await harness.store.listOpenGates()
     expect(open.map((gate) => gate.workId)).toEqual([TURN])
+  })
+
+  /**
+   * `open-gate` only requires that a work row exists at the id -- it never
+   * checks that row's format. A workId shaped like ours is therefore not proof
+   * the gate is ours, so the owning row's payloadFormat has to be confirmed.
+   */
+  it('ignores a gate whose work row belongs to another payload format', async () => {
+    const harness = store({
+      works: [workRow({ payloadFormat: 'application/vnd.qvac.harness-run+json' })],
+      gates: [gateRow({ gateId: 'approval/x/1' })]
+    })
+    expect(await harness.store.listOpenGates()).toEqual([])
+  })
+
+  it('ignores a gate whose work row is missing entirely', async () => {
+    const harness = store({ works: [], gates: [gateRow({ gateId: 'approval/x/1' })] })
+    expect(await harness.store.listOpenGates()).toEqual([])
   })
 
   it('derives the next turn seq from existing turn work ids', async () => {

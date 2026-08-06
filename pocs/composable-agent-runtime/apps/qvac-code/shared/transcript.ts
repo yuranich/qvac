@@ -5,6 +5,13 @@ import { decodeJournalBody, type CodeJournalBody } from './journal.ts'
 import { parseClaimDecision, type CodeClaim } from './claim.ts'
 import type { CodeApprovalDecision } from './approval.ts'
 
+/**
+ * There is deliberately no `superseded` status. A superseded *writer* is a
+ * display concern -- its entries render as a greyed notice -- while the turn
+ * itself is still owned by whoever holds the claim gate and will still receive
+ * an outcome from them. Making it a status would have meant deriving a
+ * terminal state from an unauthenticated journal field.
+ */
 export type CodeTurnStatus =
   | 'queued'
   | 'claimed'
@@ -13,7 +20,6 @@ export type CodeTurnStatus =
   | 'completed'
   | 'failed'
   | 'cancelled'
-  | 'superseded'
 
 export type CodeTranscriptBlock =
   | { readonly kind: 'assistant'; readonly text: string }
@@ -319,10 +325,15 @@ function deriveStatus(input: {
   if (hasUndecidedApproval) return 'awaiting-approval'
 
   if (claim != null) {
-    const supersededBySurvivor = decodedEntries.some(
-      (body) => body.type === 'turn-superseded' && body.writer === claim.executorId
-    )
-    if (supersededBySurvivor) return 'superseded'
+    // Status is derived only from state Sync arbitrates: the work row's
+    // outcome and cancel flag above, and the claim gate here. A journal
+    // entry's `writer` is self-declared -- `append-journal` neither checks
+    // that the caller won the claim nor stamps an authenticated identity, and
+    // the row has no column to stamp it into -- so any admitted peer can
+    // author an entry attributed to the winning executor. Deriving a terminal
+    // status from one would let that peer retire a live turn on every other
+    // device's screen. A forged entry can still make a `claimed` turn read as
+    // `running`, which is cosmetic; see the tech-debt note on writer identity.
     const hasActivity = decodedEntries.some(
       (body) => body.writer === claim.executorId && body.type !== 'turn-claim'
     )
