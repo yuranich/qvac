@@ -9,6 +9,9 @@ const scripts = [
   'test:task-cli',
   'test:skill-cli',
   'test:task-mobile',
+  'test:qvac-code-shared',
+  'test:qvac-code-desktop',
+  'test:qvac-code-mobile',
   'test:crash'
 ]
 

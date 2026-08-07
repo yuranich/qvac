@@ -3,7 +3,8 @@ import type {
   HarnessApprovalDecision,
   HarnessApprovalRequest,
   HarnessEvent,
-  HarnessRunRecord
+  HarnessRunRecord,
+  HarnessSkillInfo
 } from '@qvac/harness'
 import QvacLogger from '@qvac/logging'
 import Supervisor from '@qvac/supervisor'
@@ -49,6 +50,8 @@ import {
 export interface AssistantFacade {
   readonly state: AssistantStateEndpoint
   ready(): Promise<void>
+  /** The skills the application's own worker entry made available. */
+  listSkills(): Promise<readonly HarnessSkillInfo[]>
   registerAgent(registration: HarnessAgentRegistration): Promise<void>
   run(input: AssistantRunInput): AssistantRun
   cancelRun(input: { readonly agentId: string; readonly runId: string; readonly reason?: string }): Promise<void>
@@ -154,6 +157,12 @@ export function createAssistantFacade(
   return {
     state,
     ready: () => supervisor.ready(),
+    async listSkills() {
+      await supervisor.ready()
+      return supervisor
+        .get<AssistantHarnessComponent>('harness')
+        .harness.listSkills()
+    },
     async registerAgent(registration) {
       await supervisor.ready()
       await supervisor

@@ -7,7 +7,10 @@ const workspaces = [
   'apps/task-shared',
   'apps/task-cli',
   'apps/skill-cli',
-  'apps/task-mobile'
+  'apps/task-mobile',
+  'apps/qvac-code/shared',
+  'apps/qvac-code/desktop',
+  'apps/qvac-code/mobile'
 ]
 const root = new URL('..', import.meta.url).pathname
 

@@ -47,6 +47,7 @@ export const durableWorkRuntime: SyncProfileRuntime = {
     const empty: DurableWorkResult = {
       works: [],
       entries: [],
+      gates: [],
       executors: []
     }
     if (decoded.type === 'get-work') {
@@ -74,6 +75,24 @@ export const durableWorkRuntime: SyncProfileRuntime = {
         ...empty,
         entries: entries
           .filter(({ workId }) => workId === decoded.workId)
+          .sort(compareRecordedRows)
+      })
+    }
+    if (decoded.type === 'list-gates') {
+      const gates = await database.find<SyncDurableWorkGate>(GATES).toArray()
+      return encodeProfileValue({
+        ...empty,
+        gates: gates
+          .filter(({ workId }) => workId === decoded.workId)
+          .sort(compareRecordedRows)
+      })
+    }
+    if (decoded.type === 'list-open-gates') {
+      const gates = await database.find<SyncDurableWorkGate>(GATES).toArray()
+      return encodeProfileValue({
+        ...empty,
+        gates: gates
+          .filter(({ decision }) => decision == null)
           .sort(compareRecordedRows)
       })
     }
@@ -148,8 +167,16 @@ async function applyCommand(
 
   if (command.type === 'open-gate') {
     if (!(await workExists(command.workId, context))) return false
+    const id = gateKey(command.workId, command.gateId)
+    // Create-only. `insert` overwrites, so without this a second open-gate for
+    // the same gate would silently clear an existing `decision` and re-open a
+    // question that has already been answered.
+    const existing = await context.transaction.get<SyncDurableWorkGate>(GATES, {
+      id
+    })
+    if (existing) return false
     await context.transaction.insert<SyncDurableWorkGate>(GATES, {
-      id: gateKey(command.workId, command.gateId),
+      id,
       workId: command.workId,
       gateId: command.gateId,
       kind: command.kind,
@@ -231,10 +258,12 @@ function gateKey(workId: string, gateId: string) {
   return `${workId}:${gateId}`
 }
 
-function compareRecordedRows(
-  left: SyncDurableWorkJournalEntry,
-  right: SyncDurableWorkJournalEntry
-) {
+interface RecordedRow {
+  readonly id: string
+  readonly recordedAt: number
+}
+
+function compareRecordedRows(left: RecordedRow, right: RecordedRow) {
   if (left.recordedAt !== right.recordedAt) {
     return left.recordedAt - right.recordedAt
   }

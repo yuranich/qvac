@@ -1,7 +1,9 @@
 import type {
+  CreateHarnessOptions,
   HarnessAgentRegistration,
   HarnessAgentRunKey,
   HarnessEvent,
+  HarnessHostConfig,
   HarnessRunRecord,
   HarnessRuntime
 } from '@qvac/harness'
@@ -67,6 +69,19 @@ export interface CreateAssistantOptions {
   readonly sync?: Omit<CreateSyncOptions, 'storagePath'>
   readonly inference?: AssistantInference
   readonly logging?: { readonly level?: LogLevel }
+  /**
+   * Worker entries for the application's own skills. Skills belong to
+   * applications, so an application composing through this facade has to be
+   * able to name the entries that statically import them; without this it can
+   * only reach its skills by bypassing Assistant and driving Harness directly.
+   */
+  readonly workers?: CreateHarnessOptions['workers']
+  /**
+   * Harness launch configuration, including the per-skill configuration slices
+   * Harness hands to the provider of the same name. Assistant never reads
+   * inside `skills`.
+   */
+  readonly host?: HarnessHostConfig
 }
 
 export interface AssistantRunInput {

@@ -1,0 +1,38 @@
+{
+  "name": "@qvac-poc/qvac-code-mobile",
+  "version": "0.0.0-poc",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "ios:prebuild": "expo prebuild --clean --platform ios --no-install",
+    "preios": "bun run ios:prebuild",
+    "ios": "expo run:ios",
+    "android:prebuild": "expo prebuild --clean --platform android --no-install",
+    "preandroid": "bun run android:prebuild",
+    "android": "expo run:android",
+    "preandroid:build": "bun run android:prebuild",
+    "android:build": "./android/gradlew -p android app:assembleDebug",
+    "test": "bun test src",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@qvac-poc/qvac-code-shared": "0.0.0-poc",
+    "@qvac/sync": "0.0.0-poc",
+    "bare-link": "^3.3.0",
+    "buffer": "^6.0.3",
+    "events": "^3.3.0",
+    "expo": "^54.0.33",
+    "expo-build-properties": "~1.0.10",
+    "expo-file-system": "^19.0.21",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-bare-kit": "^0.14.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/react": "^19.1.17",
+    "typescript": "^5.9.3"
+  }
+}

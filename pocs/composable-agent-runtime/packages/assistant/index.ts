@@ -50,6 +50,11 @@ function createDesktopComponents(
         storagePath
       }),
     startHarness: ({ state }) =>
-      startHarnessComponent(state, inference)
+      startHarnessComponent(state, {
+        inference,
+        ...(options.logging ? { logging: options.logging } : {}),
+        ...(options.workers ? { workers: options.workers } : {}),
+        ...(options.host ? { host: options.host } : {})
+      })
   }
 }

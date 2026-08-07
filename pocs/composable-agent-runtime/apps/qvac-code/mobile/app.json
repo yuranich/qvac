@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "QVAC Code",
+    "slug": "qvac-code",
+    "version": "0.0.0",
+    "newArchEnabled": true,
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "bundleIdentifier": "com.qvac.poc.qvac-code"
+    },
+    "android": {
+      "package": "com.qvac.poc.qvaccode"
+    },
+    "plugins": [
+      "@qvac/sync/expo-plugin"
+    ]
+  }
+}

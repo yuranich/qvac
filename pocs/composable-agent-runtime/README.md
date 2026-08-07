@@ -166,6 +166,52 @@ The validator writes its complete JSON report to stdout and to `--json` when
 provided. It exits nonzero for duplicate singleton versions within one realm,
 native addon conflicts, linker-manifest drift, or missing staged prebuilds.
 
+## Run the coding agent
+
+`apps/qvac-code` is a coding agent whose sessions are created on a phone and
+executed on a laptop. It is the first thing here that puts tools across the
+device boundary: before it, every agent registration in this workspace was
+`skills: [], toolPolicy: { allow: [], requireApproval: [] }`, so the skill
+machinery and the delegation machinery had never met.
+
+```sh
+bun apps/qvac-code/desktop/index.ts serve --project ~/dev/scratch/demo-repo --storage /tmp/qvac-code
+```
+
+The laptop prints a pairing URI, runs a terminal UI, and executes turns with
+Qwen3.5 9B and a sandboxed skill scoped to that one directory —
+`read`/`write`/`edit`/`glob`/`grep`/`ls` plus a shell matched exactly against a
+fixed argv allowlist. `write`, `edit` and `shell` always require approval, and
+either device can decide: whichever answer reaches the gate first wins, and the
+other adopts it.
+
+For a single prompt with no phone and no mesh:
+
+```sh
+bun apps/qvac-code/desktop/index.ts once --project ~/dev/scratch/demo-repo --storage /tmp/qvac-code --prompt "add a test for expired pairing invites"
+```
+
+The phone (`apps/qvac-code/mobile`) configures `@qvac/sync/expo-plugin` and
+nothing else — no Assistant, no Harness, no SDK, no model. It is the repo's first
+standalone-Sync consumer app, and `test/subsets.test.ts` holds it to that.
+
+This required two changes to the packages it composes, both closing real gaps
+rather than bending a boundary. Sync's `gate` capability was writable but
+unreadable, so `list-gates` and `list-open-gates` were added and `open-gate`
+became create-only. Assistant could not carry an application's own skills —
+`workers`, `host` and `listSkills()` now do. See
+[ADR 0006](docs/arch/adrs/0006-coding-sessions-on-durable-work.md) for the
+session encoding and the claim-as-gate decision, and
+[TD-DURABLE-WORK-CLAIM-GUARANTEES](docs/arch/tech-debt/TD-DURABLE-WORK-CLAIM-GUARANTEES.md)
+for what claiming a turn does and does not guarantee.
+
+```sh
+bun run test:qvac-code-shared
+bun run test:qvac-code-desktop
+bun run test:qvac-code-mobile
+bun run test:qvac-code-chaos     # two executors, one turn, real replication; slow
+```
+
 ## Evidence policy
 
 Fast tests use deterministic adapters. Separate integration tests exercise real

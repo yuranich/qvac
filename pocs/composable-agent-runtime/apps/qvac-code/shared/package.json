@@ -1,0 +1,21 @@
+{
+  "name": "@qvac-poc/qvac-code-shared",
+  "version": "0.0.0-poc",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./store": "./store.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@qvac/sync": "0.0.0-poc"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "^5.9.3"
+  }
+}

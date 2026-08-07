@@ -1,0 +1,4 @@
+.expo/
+qvac/
+generated/*.bundle
+generated/*.js

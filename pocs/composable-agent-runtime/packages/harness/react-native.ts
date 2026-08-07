@@ -14,6 +14,11 @@ export {
   harnessCompatibility,
   type HarnessRuntimeHandshake
 } from './lib/runtime/compatibility.ts'
+// Type only, and not accepted by `createMobileHarness`: on mobile the worker
+// bundle and its skills are fixed at prebuild by the Expo plugin, so there is
+// no launch-time host config. Exported so contracts shared with the desktop
+// realm still resolve under the react-native condition.
+export type { HarnessHostConfig } from './lib/runtime/host-config.ts'
 export type {
   DurableStatePort,
   DurableStateInput,
