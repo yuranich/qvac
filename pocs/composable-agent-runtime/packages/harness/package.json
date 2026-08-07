@@ -132,8 +132,8 @@
   "devDependencies": {
     "@expo/config-plugins": "^54.0.4",
     "@expo/config-types": "^54.0.0",
-    "bare-pipe": "^4.2.3",
-    "bare-tcp": "^2.5.3",
+    "bare-pipe": "4.2.2",
+    "bare-tcp": "2.5.2",
     "brittle": "^4.0.2",
     "typescript": "^5.9.3"
   }
