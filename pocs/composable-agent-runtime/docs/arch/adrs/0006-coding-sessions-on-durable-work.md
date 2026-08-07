@@ -126,8 +126,24 @@ admitted peer retire a live turn on every other device's screen.
 Sync gains `list-gates` and `list-open-gates` and a `gate-read` capability, and
 `open-gate` becomes create-only — a second open previously cleared an existing
 decision, re-asking a question that had already been answered.
-`list-open-gates` is bounded by outstanding decisions rather than by history, so
-it is the one thing a phone can watch for the lifetime of the mesh.
+
+`list-open-gates` returns only outstanding decisions, so the cost that property 4
+above makes expensive — re-serializing a watch's whole encoded result on every
+mesh change — stays flat as history grows. Its *scan* does not: like every query
+in this reducer it reads the whole table and filters afterwards, so it walks every
+gate ever recorded. That asymmetry is what makes it cheap to watch and not cheap
+to call in a tight loop.
+
+`gate-read` is declared, not negotiated. Nothing reads
+`SyncProfileContract.capabilities` anywhere in the tree, so it records the
+distinction for a future reader rather than enforcing it; a peer talking to an
+older runtime still discovers the gap by having its query rejected.
+
+`DurableWorkResult` also grows another required array, continuing its shape as a
+bag of fields where each query populates one. That follows the existing local
+convention, but per-query result types would make the invalid combinations
+unrepresentable, and this profile should get them before it graduates from the
+PoC.
 
 Assistant gains `workers`, `host` and `listSkills()`, because an application
 composing through the facade could not otherwise reach its own skills — a

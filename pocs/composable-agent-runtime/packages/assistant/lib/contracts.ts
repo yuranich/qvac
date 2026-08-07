@@ -1,4 +1,5 @@
 import type {
+  CreateHarnessOptions,
   HarnessAgentRegistration,
   HarnessAgentRunKey,
   HarnessEvent,
@@ -74,10 +75,7 @@ export interface CreateAssistantOptions {
    * able to name the entries that statically import them; without this it can
    * only reach its skills by bypassing Assistant and driving Harness directly.
    */
-  readonly workers?: {
-    readonly harnessChildEntry?: string
-    readonly toolSandboxChildEntry?: string
-  }
+  readonly workers?: CreateHarnessOptions['workers']
   /**
    * Harness launch configuration, including the per-skill configuration slices
    * Harness hands to the provider of the same name. Assistant never reads

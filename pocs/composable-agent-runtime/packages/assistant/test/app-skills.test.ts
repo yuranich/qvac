@@ -66,6 +66,30 @@ describe('application-owned skills through the facade', () => {
     expect(calls[0]?.host).toEqual(options.host)
   })
 
+  /**
+   * The desktop component factory used to call `startHarnessComponent(state,
+   * inference)` and drop the optional third argument, so an application that
+   * asked for a log level got it in Sync and Assistant but not in Harness.
+   *
+   * This pins the forwarding contract, not the factory — `createDesktopComponents`
+   * is internal and adding an export to reach it would make a test the reason for
+   * a public contract. What actually prevents the original slip from recurring is
+   * the signature: with the options object, omitting `logging` is a visible
+   * choice, where a trailing optional positional argument invited dropping it.
+   */
+  it('carries the application log level into Harness', async () => {
+    const calls: Array<Record<string, unknown>> = []
+    await startHarnessComponent(fakeSyncRuntime(), {
+      inference: { kind: 'deterministic' },
+      logging: { level: 'debug' },
+      createHarness: (input) => {
+        calls.push(input as unknown as Record<string, unknown>)
+        return fakeHarnessRuntime()
+      }
+    })
+    expect(calls[0]?.logging).toEqual({ level: 'debug' })
+  })
+
   it('omits both when the application supplies neither', async () => {
     const calls: Array<Record<string, unknown>> = []
     await startHarnessComponent(fakeSyncRuntime(), {

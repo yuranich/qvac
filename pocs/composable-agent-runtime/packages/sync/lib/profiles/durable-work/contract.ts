@@ -68,9 +68,17 @@ export type DurableWorkQuery =
   | { readonly type: 'list-journal'; readonly workId: string }
   | { readonly type: 'list-gates'; readonly workId: string }
   /**
-   * Every gate still awaiting a decision, across all work. Bounded by the
-   * number of undecided gates rather than by history, so a peer can watch it
-   * for the lifetime of the mesh without the cost growing.
+   * Every gate still awaiting a decision, across all work.
+   *
+   * The *result* is bounded by the number of undecided gates rather than by
+   * history, which is what makes this cheap to watch: a watch re-serializes its
+   * whole encoded result on every mesh change, and that cost stays flat here
+   * while a journal watch's grows.
+   *
+   * The *scan* is not bounded — like every other query in this reducer, it reads
+   * the whole table and filters afterwards, so it walks every gate ever recorded
+   * (one claim gate per turn, plus every approval). Fine at the scale this
+   * profile is exercised at, and worth revisiting before it is.
    */
   | { readonly type: 'list-open-gates' }
   | { readonly type: 'list-executor-presence' }
@@ -98,8 +106,10 @@ export const durableWorkProfile: SyncProfileContract<
     'checkpoint-ref',
     'gate',
     // Gates were writable but unreadable until `list-gates`/`list-open-gates`
-    // existed. Advertised separately so a peer can tell a runtime that can
-    // report gate state from one that can only record it.
+    // existed. Declared separately so the distinction is recorded, but nothing
+    // reads `capabilities` yet: this is documentation, not negotiation, and a
+    // peer talking to an older runtime still finds out by having its query
+    // rejected rather than by checking here first.
     'gate-read',
     'outcome',
     'executor-presence'
